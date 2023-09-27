@@ -32,3 +32,14 @@ func TestXORHexStrings(t *testing.T) {
 		t.Errorf("got: %s\nwant: %s\n", gotStr, hexWantStr)
 	}
 }
+
+func TestSingleByteXOR(t *testing.T) {
+	hexStr := "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
+
+	gotStr, err := SingleByteXOR(hexStr)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+
+	t.Logf("Decoded string: %s", gotStr)
+}

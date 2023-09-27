@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math"
 )
 
 // HexToBase64 converts a hexadecimal string to its Base64 representation.
@@ -45,4 +46,72 @@ func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
 	}
 
 	return hex.EncodeToString(result), nil
+}
+
+// SingleByteXOR attempts to decrypt a given hex-encoded ciphertext by XORing it against
+// each letter of the English alphabet. It then checks which resulting plaintext has
+// character frequencies closest to typical English text.
+func SingleByteXOR(inputHex string) (string, error) {
+	decoded, err := hex.DecodeString(inputHex)
+	if err != nil {
+		return "", fmt.Errorf("malformed input hex string: %s", inputHex)
+	}
+
+	var (
+		bestScore  float64 = math.MaxFloat64
+		bestString string
+	)
+
+	const alphabet = "abcdefghijklmnopqrstuvwxyz"
+	for _, char := range alphabet {
+		decrypted := xorWithChar(decoded, byte(char))
+		score := computeScore(decrypted)
+
+		if score < bestScore {
+			bestScore = score
+			bestString = string(decrypted)
+		}
+	}
+
+	return bestString, nil
+}
+
+// xorWithChar decrypts a byte slice by XORing each byte with the provided character.
+// The function also ensures that all uppercase letters in the resulting slice are
+// converted to lowercase for consistent scoring and analysis.
+func xorWithChar(data []byte, char byte) []byte {
+	const uppercaseToLowercaseShift = 'a' - 'A'
+
+	result := make([]byte, len(data))
+	for i, b := range data {
+		result[i] = b ^ char
+
+		// Convert uppercase letter to lowercase
+		if result[i] >= 'A' && result[i] <= 'Z' {
+			result[i] += uppercaseToLowercaseShift
+		}
+	}
+	return result
+}
+
+// computeScore calculates and returns a score for the given data based on how closely its
+// character frequencies match typical English text. A lower score indicates a closer
+// match to English.
+func computeScore(data []byte) float64 {
+	var letterFrequencies [26]float64
+	totalChars := float64(len(data))
+
+	for _, b := range data {
+		if b >= 'a' && b <= 'z' {
+			letterFrequencies[b-'a']++
+		}
+	}
+
+	var score float64
+	for i := range letterFrequencies {
+		letterFrequencies[i] /= totalChars
+		score += math.Abs(_englishLetterFrequencies[i] - letterFrequencies[i])
+	}
+
+	return score
 }
