@@ -2,7 +2,12 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
+	"encoding/hex"
+	"fmt"
+	"io"
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -15,8 +20,7 @@ func TestHexToBase64(t *testing.T) {
 	gotStr, err := HexToBase64(hexTestStr)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
-	}
-	if gotStr != base64WantStr {
+	} else if gotStr != base64WantStr {
 		t.Errorf("got: %s\nwant: %s\n", gotStr, base64WantStr)
 	}
 }
@@ -31,23 +35,26 @@ func TestXORHexStrings(t *testing.T) {
 	gotStr, err := XORHexStrings(hexStr1, hexStr2)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
-	}
-	if gotStr != hexWantStr {
+	} else if gotStr != hexWantStr {
 		t.Errorf("got: %s\nwant: %s\n", gotStr, hexWantStr)
 	}
 }
 
 func TestSingleByteXOR(t *testing.T) {
 	hexStr := "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
-
-	gotStr, err := SingleByteXOR(hexStr)
+	cipherText, err := decodeTestHex(t, hexStr)
 	if err != nil {
-		t.Errorf("unexpected error: %s", err)
+		t.Fatalf("unexpected error: %s", err)
 	}
 
+	gotStr, gotKey := SingleByteXOR(cipherText)
+
+	t.Logf("Key: %c", gotKey)
 	t.Logf("Decoded string: %s", gotStr)
+
 }
 
+// Challenge 4 of Set 1.
 func TestSingleByteXORFile(t *testing.T) {
 	f, err := os.Open("./files/1_4.txt")
 	if err != nil {
@@ -56,20 +63,24 @@ func TestSingleByteXORFile(t *testing.T) {
 	defer f.Close()
 
 	var (
-		s          = bufio.NewScanner(f)
-		bestScore  float64
-		bestString string
+		s         = bufio.NewScanner(f)
+		bestScore float64
+		plainText string
+		key       byte
 	)
 	for s.Scan() {
-		gotStr, err := SingleByteXOR(s.Text())
+		cipherText, err := decodeTestHex(t, s.Text())
 		if err != nil {
-			t.Errorf("unexpected error: %s", err)
+			t.Fatalf("unexpected error: %s", err)
 		}
+
+		gotStr, gotKey := SingleByteXOR(cipherText)
 
 		score := computeScore([]byte(gotStr))
 		if score > bestScore {
 			bestScore = score
-			bestString = gotStr
+			plainText = gotStr
+			key = gotKey
 		}
 	}
 
@@ -77,20 +88,118 @@ func TestSingleByteXORFile(t *testing.T) {
 		t.Fatalf("parsing file: %s", err)
 	}
 
-	t.Logf("Decoded string: %s", bestString)
+	t.Logf("Key: %c", key)
+	t.Logf("Decoded string: %s", plainText)
 }
 
 func TestRepeatingKeyXOR(t *testing.T) {
 	var (
-		inputText = `Burning 'em, if you ain't quick and nimble
-I go crazy when I hear a cymbal`
+		inputText = []byte(`Burning 'em, if you ain't quick and nimble
+I go crazy when I hear a cymbal`)
 
-		inputKey       = "ICE"
+		inputKey       = []byte("ICE")
 		wantCipherText = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
 	)
 
-	gotCipherText := RepeatingKeyXOR(inputText, []byte(inputKey))
-	if gotCipherText != wantCipherText {
+	gotCipherText := RepeatingKeyXOR(inputText, inputKey)
+	if hex.EncodeToString(gotCipherText) != wantCipherText {
 		t.Errorf("expected:\n%s\nbut got:\n%s", wantCipherText, gotCipherText)
 	}
+}
+
+func TestBreakRepeatingKeyXOR(t *testing.T) {
+	f, err := os.Open("./files/1_6.txt")
+	if err != nil {
+		t.Fatalf("opening file: %s", err)
+	}
+	defer f.Close()
+
+	cipherText, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatalf("reading file: %s", err)
+	}
+
+	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(cipherText)))
+	bytesWritten, err := base64.StdEncoding.Decode(decoded, cipherText)
+	if err != nil {
+		t.Fatalf("decoding file contents from base64: %s", err)
+	}
+	decoded = decoded[:bytesWritten]
+
+	var maxKeySize uint = 40
+	plainText, key, err := BreakRepeatingKeyXOR(decoded, maxKeySize)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	t.Logf("Key: %s", key)
+	t.Logf("Key Size: %d", len(key))
+	t.Logf("Plain-text:\n%s", plainText)
+}
+
+func TestHammingDistance(t *testing.T) {
+	var (
+		inputText1   = "this is a test"
+		inputText2   = "wokka wokka!!!"
+		wantDistance = 37
+	)
+	gotDistance, err := hammingDistance([]byte(inputText1), []byte(inputText2))
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if gotDistance != wantDistance {
+		t.Errorf("expected Hamming distance %d but got %d", wantDistance, gotDistance)
+	}
+}
+
+func TestTranspose(t *testing.T) {
+	cipherText := []byte{
+		'a', 'b', 'c', 'd', 'e',
+		'f', 'g', 'h', 'i', 'j',
+		'k', 'l', 'm', 'n', 'o',
+	}
+	keySize := 3
+
+	var (
+		cipherTextLen = len(cipherText)
+		transposed    = make([]byte, cipherTextLen)
+		nBlocks       = cipherTextLen / keySize
+	)
+	if cipherTextLen%keySize != 0 {
+		nBlocks++
+	}
+	for blockIdx := 0; blockIdx < nBlocks; blockIdx++ {
+		for byteIdx := 0; byteIdx < keySize; byteIdx++ {
+			var (
+				index           = blockIdx*keySize + byteIdx
+				transposedIndex = byteIdx*nBlocks + blockIdx
+			)
+			if index >= cipherTextLen {
+				break
+			}
+			transposed[transposedIndex] = cipherText[index]
+		}
+	}
+
+	want := []byte{
+		'a', 'd', 'g', 'j', 'm',
+		'b', 'e', 'h', 'k', 'n',
+		'c', 'f', 'i', 'l', 'o',
+	}
+
+	if !slices.Equal(transposed, want) {
+		t.Errorf("want: %c, but got %c", want, transposed)
+	}
+}
+
+// decodeTestHex attempts to decode the provided hex string into a byte slice.
+func decodeTestHex(t *testing.T, hexStr string) ([]byte, error) {
+	t.Helper()
+
+	decodedHex, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, fmt.Errorf("malformed hex string '%s': %s", hexStr, err)
+	}
+
+	return decodedHex, nil
 }
