@@ -74,6 +74,22 @@ func SingleByteXOR(inputHex string) (string, error) {
 	return bestString, nil
 }
 
+// RepeatingKeyXOR encrypts the given text using a repeating-key XOR operation.
+// The function takes in a plain text and a key as input. Each byte of the text is XORed
+// with a corresponding byte from the key. If the length of the text exceeds the length of
+// the key, the key is repeated cyclically.
+func RepeatingKeyXOR(text string, key []byte) string {
+	var (
+		result = []byte(text)
+		keyLen = len(key)
+	)
+	for i := range result {
+		result[i] ^= key[i%keyLen]
+	}
+
+	return hex.EncodeToString(result)
+}
+
 // xorWithChar decrypts a byte slice by XORing each byte with the provided character.
 func xorWithChar(data []byte, char byte) []byte {
 	result := make([]byte, len(data))
