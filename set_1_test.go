@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"bufio"
+	"os"
+	"testing"
+)
 
 func TestHexToBase64(t *testing.T) {
 	var (
@@ -42,4 +46,36 @@ func TestSingleByteXOR(t *testing.T) {
 	}
 
 	t.Logf("Decoded string: %s", gotStr)
+}
+
+func TestSingleByteXORFile(t *testing.T) {
+	f, err := os.Open("./files/1_4.txt")
+	if err != nil {
+		t.Fatalf("opening file: %s", err)
+	}
+	defer f.Close()
+
+	var (
+		s          = bufio.NewScanner(f)
+		bestScore  float64
+		bestString string
+	)
+	for s.Scan() {
+		gotStr, err := SingleByteXOR(s.Text())
+		if err != nil {
+			t.Errorf("unexpected error: %s", err)
+		}
+
+		score := computeScore([]byte(gotStr))
+		if score > bestScore {
+			bestScore = score
+			bestString = gotStr
+		}
+	}
+
+	if err := s.Err(); err != nil {
+		t.Fatalf("parsing file: %s", err)
+	}
+
+	t.Logf("Decoded string: %s", bestString)
 }

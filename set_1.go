@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math"
+	"unicode/utf8"
 )
 
 // HexToBase64 converts a hexadecimal string to its Base64 representation.
@@ -49,8 +49,8 @@ func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
 }
 
 // SingleByteXOR attempts to decrypt a given hex-encoded ciphertext by XORing it against
-// each letter of the English alphabet. It then checks which resulting plaintext has
-// character frequencies closest to typical English text.
+// each 255 1-byte keys. It then checks which resulting plaintext has character
+// frequencies closest to typical English text.
 func SingleByteXOR(inputHex string) (string, error) {
 	decoded, err := hex.DecodeString(inputHex)
 	if err != nil {
@@ -58,16 +58,14 @@ func SingleByteXOR(inputHex string) (string, error) {
 	}
 
 	var (
-		bestScore  float64 = math.MaxFloat64
+		bestScore  float64
 		bestString string
 	)
-
-	const alphabet = "abcdefghijklmnopqrstuvwxyz"
-	for _, char := range alphabet {
+	for char := 0; char <= 255; char++ {
 		decrypted := xorWithChar(decoded, byte(char))
 		score := computeScore(decrypted)
 
-		if score < bestScore {
+		if score > bestScore {
 			bestScore = score
 			bestString = string(decrypted)
 		}
@@ -77,41 +75,46 @@ func SingleByteXOR(inputHex string) (string, error) {
 }
 
 // xorWithChar decrypts a byte slice by XORing each byte with the provided character.
-// The function also ensures that all uppercase letters in the resulting slice are
-// converted to lowercase for consistent scoring and analysis.
 func xorWithChar(data []byte, char byte) []byte {
-	const uppercaseToLowercaseShift = 'a' - 'A'
-
 	result := make([]byte, len(data))
 	for i, b := range data {
 		result[i] = b ^ char
-
-		// Convert uppercase letter to lowercase
-		if result[i] >= 'A' && result[i] <= 'Z' {
-			result[i] += uppercaseToLowercaseShift
-		}
 	}
 	return result
 }
 
 // computeScore calculates and returns a score for the given data based on how closely its
-// character frequencies match typical English text. A lower score indicates a closer
+// character frequencies match typical English text. A higher score indicates a closer
 // match to English.
 func computeScore(data []byte) float64 {
-	var letterFrequencies [26]float64
-	totalChars := float64(len(data))
+	const uppercaseToLowercaseShift = 'a' - 'A'
+	var (
+		// we use [utf8.RuneCountInString] instead of len(text) because len(text) returns
+		// the number of *bytes*. However, recall that in UTF-8 some characters are
+		// encoded using 2 bytes, therefore len(text) could return a number which is
+		// higher than the actual number of characters in the text. In contrast
+		// [utf8.RuneCountInString] returns the exact number of *characters* in the text,
+		// which is what we want here.
+		totalChars = float64(utf8.RuneCount(data))
+		score      float64
+	)
 
 	for _, b := range data {
+		if b >= 'A' && b <= 'Z' {
+			b += uppercaseToLowercaseShift
+		}
+
 		if b >= 'a' && b <= 'z' {
-			letterFrequencies[b-'a']++
+			score += _englishLetterFrequencies[b-'a']
+		} else if b == ' ' {
+			score += _spaceFrequency
 		}
 	}
 
-	var score float64
-	for i := range letterFrequencies {
-		letterFrequencies[i] /= totalChars
-		score += math.Abs(_englishLetterFrequencies[i] - letterFrequencies[i])
-	}
-
-	return score
+	// Normalization: a longer text will have a higher score because it has more
+	// characters. By normalizing, we adjust for the length of the text, making scores
+	// from different text lengths comparable.
+	// By doing this, the function calculates the average score per character, giving
+	// metric that represents the "English-likeness" of the text on a per-character basis.
+	return score / totalChars
 }

@@ -16,3 +16,5 @@ var _englishLetterFrequencies = [26]float64{
 	// z
 	0.002722,
 }
+
+const _spaceFrequency = 0.1918182
