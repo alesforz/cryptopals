@@ -153,21 +153,18 @@ func TestHammingDistance(t *testing.T) {
 }
 
 func TestTranspose(t *testing.T) {
-	cipherText := []byte{
-		'a', 'b', 'c', 'd', 'e',
-		'f', 'g', 'h', 'i', 'j',
-		'k', 'l', 'm', 'n', 'o',
-	}
-	keySize := 3
-
 	var (
+		cipherText = []byte{
+			'a', 'b', 'c', 'd', 'e',
+			'f', 'g', 'h', 'i', 'j',
+			'k', 'l', 'm', 'n', 'o',
+		}
+		keySize       = 3
 		cipherTextLen = len(cipherText)
 		transposed    = make([]byte, cipherTextLen)
-		nBlocks       = cipherTextLen / keySize
+		nBlocks       = (cipherTextLen + keySize - 1) / keySize
 	)
-	if cipherTextLen%keySize != 0 {
-		nBlocks++
-	}
+
 	for blockIdx := 0; blockIdx < nBlocks; blockIdx++ {
 		for byteIdx := 0; byteIdx < keySize; byteIdx++ {
 			var (
