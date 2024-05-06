@@ -14,9 +14,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// hexToBase64 converts a hexadecimal string to its Base64 representation.
 // Challenge 1 of Set 1.
-// HexToBase64 converts a hexadecimal string to its Base64 representation.
-func HexToBase64(inputHex string) (string, error) {
+func hexToBase64(inputHex string) (string, error) {
 	decoded, err := hex.DecodeString(inputHex)
 	if err != nil {
 		return "", fmt.Errorf("malformed input hex string: %x", inputHex)
@@ -25,10 +25,10 @@ func HexToBase64(inputHex string) (string, error) {
 	return base64.StdEncoding.EncodeToString(decoded), nil
 }
 
-// Challenge 2 of Set 1.
-// XORHexStrings performs a bitwise XOR operation between two input hexadecimal
+// xorHexStrings performs a bitwise XOR operation between two input hexadecimal
 // strings of equal length and returns the result as a hexadecimal string.
-func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
+// Challenge 2 of Set 1.
+func xorHexStrings(inputHex1, inputHex2 string) (string, error) {
 	// We decode the hex strings to bytes before checking their length, because
 	// the byte length might be different from the hex string length due to how
 	// hexadecimal encoding works, and direct string length comparison might
@@ -58,11 +58,11 @@ func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
 	return hex.EncodeToString(result), nil
 }
 
-// Challenge 3 and 4 of Set 1.
-// SingleByteXOR attempts to decrypt a given ciphertext by XORing it against
+// singleByteXOR attempts to decrypt a given ciphertext by XORing it against
 // each 255 1-byte keys. It then checks which resulting plaintext has character
 // frequencies closest to typical English text.
-func SingleByteXOR(cipherText []byte) (string, byte) {
+// Challenge 3 and 4 of Set 1.
+func singleByteXOR(cipherText []byte) (string, byte) {
 	var (
 		bestScore float64
 		plainText []byte
@@ -84,14 +84,14 @@ func SingleByteXOR(cipherText []byte) (string, byte) {
 	return string(plainText), key
 }
 
-// Challenge 5 of Set 1.
-// RepeatingKeyXOR encrypts the given text using a repeating-key XOR operation.
+// repeatingKeyXOR encrypts the given text using a repeating-key XOR operation.
 // The function takes in a plain text and a key as input. Each byte of the text
 // is XORed with a corresponding byte from the key. If the length of the text
 // exceeds the length of the key, the key is repeated cyclically.
 // For example, if the text is "HELLO" and the key is "AB", the effective key
 // used for encryption would be "ABABA".
-func RepeatingKeyXOR(plainText, key []byte) []byte {
+// Challenge 5 of Set 1.
+func repeatingKeyXOR(plainText, key []byte) []byte {
 	var (
 		cipherText = make([]byte, len(plainText))
 		keyLen     = len(key)
@@ -103,17 +103,17 @@ func RepeatingKeyXOR(plainText, key []byte) []byte {
 	return cipherText
 }
 
-// Challenge 6 of Set 1.
-// BreakRepeatingKeyXOR:
-// 1. Determine the probable key size using statistical analysis.
-// 2. Transpose the cipher text by aligning bytes encrypted with the same key
+// breakRepeatingKeyXOR:
+// 1. Determines the probable key size using statistical analysis.
+// 2. Transposes the cipher text by aligning bytes encrypted with the same key
 // byte.
-// 3. Recover the decryption key with frequency analysis on each transposed
+// 3. Recovers the decryption key with frequency analysis on each transposed
 // block to determine the key's byte used to encrypt that particular block.
-// 4. Decrypt the cipher text
+// 4. Decrypts the cipher text
 // Returns the decrypted text, the key used to encrypt/decrypt it, and an error
 // (if any).
-func BreakRepeatingKeyXOR(
+// Challenge 6 of Set 1.
+func breakRepeatingKeyXOR(
 	cipherText []byte,
 	maxKeySize int,
 ) (string, string, error) {
@@ -217,28 +217,27 @@ func BreakRepeatingKeyXOR(
 		}
 
 		block := transposed[blockStart:blockEnd]
-		_, blockKey := SingleByteXOR(block)
+		_, blockKey := singleByteXOR(block)
 
 		decryptionKey[k] = blockKey
 	}
 
-	plainText := RepeatingKeyXOR(cipherText, decryptionKey)
+	plainText := repeatingKeyXOR(cipherText, decryptionKey)
 
 	return string(plainText), string(decryptionKey), nil
 }
 
-// Challenge 7 of Set 1.
-// DecryptAESECB decrypts a cipher text encrypted using AES-128 in ECB mode with
-// the given key.
-func DecryptAESECBString(cipherText, key string) (string, error) {
-	plainText, err := DecryptAESECB([]byte(cipherText), []byte(key))
+// decryptAESECBString is a wrapper of decryptAESECB for when you have a cipher
+// text to decrypt and a key to decrypt it as strings.
+func decryptAESECBString(cipherText, key string) (string, error) {
+	plainText, err := decryptAESECB([]byte(cipherText), []byte(key))
 	return string(plainText), err
 }
 
-// Challenge 7 of Set 1.
-// DecryptAESECB decrypts a cipher text encrypted using AES-128 in ECB mode with
+// decryptAESECB decrypts a cipher text encrypted using AES-128 in ECB mode with
 // the given key.
-func DecryptAESECB(cipherText, key []byte) ([]byte, error) {
+// Challenge 7 of Set 1.
+func decryptAESECB(cipherText, key []byte) ([]byte, error) {
 	var (
 		cipherTextLen = len(cipherText)
 		keyLen        = len(key)
@@ -267,6 +266,47 @@ func DecryptAESECB(cipherText, key []byte) ([]byte, error) {
 	}
 
 	return plainText, nil
+}
+
+// isEncryptedAESECBString is a wrapper around isEncryptedAESECB for when you
+// have a cipher text to decrypt as a string.
+func isEncryptedAESECBString(cipherText string) bool {
+	return isEncryptedAESECB([]byte(cipherText))
+}
+
+// isEncryptedAESECB returns true if the given cipherText was encrypted using
+// AES ECB. It leverages the fact that ECB is stateless and deterministic; the
+// same 16 byte plaintext block will always produce the same 16 byte
+// ciphertext.
+// Challenge 8 of Set 1.
+func isEncryptedAESECB(cipherText []byte) bool {
+	const blockSize = aes.BlockSize
+
+	cipherTextLen := len(cipherText)
+	if cipherTextLen%blockSize != 0 {
+		return false
+	}
+
+	type block [blockSize]byte
+
+	var (
+		nBlocks = (cipherTextLen + blockSize - 1) / blockSize
+		set     = make(map[block]struct{}, nBlocks)
+	)
+	for b := range nBlocks {
+		var (
+			start = b * blockSize
+			end   = start + blockSize
+
+			// get the slice's underlying array
+			currBlock = (block)(cipherText[start:end])
+		)
+		if _, ok := set[currBlock]; ok {
+			return true
+		}
+		set[currBlock] = struct{}{}
+	}
+	return false
 }
 
 // xorWithChar XORs each byte of data with the provided character.

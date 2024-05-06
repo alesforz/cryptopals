@@ -17,7 +17,7 @@ func TestHexToBase64(t *testing.T) {
 		base64WantStr = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
 	)
 
-	gotStr, err := HexToBase64(hexTestStr)
+	gotStr, err := hexToBase64(hexTestStr)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	} else if gotStr != base64WantStr {
@@ -32,7 +32,7 @@ func TestXORHexStrings(t *testing.T) {
 		hexWantStr = "746865206b696420646f6e277420706c6179"
 	)
 
-	gotStr, err := XORHexStrings(hexStr1, hexStr2)
+	gotStr, err := xorHexStrings(hexStr1, hexStr2)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	} else if gotStr != hexWantStr {
@@ -48,7 +48,7 @@ func TestSingleByteXOR(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	gotStr, gotKey := SingleByteXOR(cipherText)
+	gotStr, gotKey := singleByteXOR(cipherText)
 
 	t.Logf("Key: %c", gotKey)
 	t.Logf("Decoded string: %s", gotStr)
@@ -75,7 +75,7 @@ func TestSingleByteXORFile(t *testing.T) {
 			t.Fatalf("unexpected error: %s", err)
 		}
 
-		gotStr, gotKey := SingleByteXOR(cipherText)
+		gotStr, gotKey := singleByteXOR(cipherText)
 
 		score := computeTextScore([]byte(gotStr))
 		if score > bestScore {
@@ -103,7 +103,7 @@ I go crazy when I hear a cymbal`)
 		wantCipherText = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
 	)
 
-	gotCipherText := RepeatingKeyXOR(inputText, inputKey)
+	gotCipherText := repeatingKeyXOR(inputText, inputKey)
 	if hex.EncodeToString(gotCipherText) != wantCipherText {
 		t.Errorf("expected:\n%s\nbut got:\n%s", wantCipherText, gotCipherText)
 	}
@@ -124,7 +124,7 @@ func TestBreakRepeatingKeyXOR(t *testing.T) {
 	}
 
 	var maxKeySize = 40
-	plainText, key, err := BreakRepeatingKeyXOR(cipherText, maxKeySize)
+	plainText, key, err := breakRepeatingKeyXOR(cipherText, maxKeySize)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -149,12 +149,43 @@ func TestDecryptAESECB(t *testing.T) {
 	}
 
 	const key = "YELLOW SUBMARINE"
-	plainText, err := DecryptAESECB(cipherText, []byte(key))
+	plainText, err := decryptAESECB(cipherText, []byte(key))
 	if err != nil {
 		t.Error(err)
 	}
 
 	t.Log(string(plainText))
+}
+
+// Challenge 8 of set 1.
+func TestDetectAESECB(t *testing.T) {
+	f, err := os.Open("./files/1_8.txt")
+	if err != nil {
+		t.Fatalf("opening file: %s", err)
+	}
+	defer f.Close()
+
+	var (
+		s     = bufio.NewScanner(f)
+		count int
+	)
+	for s.Scan() {
+		count++
+
+		cipherText := s.Text()
+
+		decoded, err := hex.DecodeString(cipherText)
+		if err != nil {
+			t.Errorf("decoding cipher text %d: %x from hex", count, cipherText)
+		}
+		if isEncryptedAESECB(decoded) {
+			t.Logf("cipher text %d is encrypted using AES ECB", count)
+			break
+		}
+	}
+	if err := s.Err(); err != nil {
+		t.Errorf("reading input file: %s", err)
+	}
 }
 
 func TestHammingDistance(t *testing.T) {
