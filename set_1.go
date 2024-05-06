@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"math/bits"
@@ -24,13 +25,13 @@ func HexToBase64(inputHex string) (string, error) {
 }
 
 // Challenge 2 of Set 1.
-// XORHexStrings performs a bitwise XOR operation between two input hexadecimal strings
-// of equal length and returns the result as a hexadecimal string.
+// XORHexStrings performs a bitwise XOR operation between two input hexadecimal
+// strings of equal length and returns the result as a hexadecimal string.
 func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
-	// We decode the hex strings to bytes before checking their length, because the byte
-	// length might be different from the hex string length due to how hexadecimal
-	// encoding works, and direct string length comparison might not always give you the
-	// correct assessment.
+	// We decode the hex strings to bytes before checking their length, because
+	// the byte length might be different from the hex string length due to how
+	// hexadecimal encoding works, and direct string length comparison might
+	// not always give you the correct assessment.
 	decoded1, err := hex.DecodeString(inputHex1)
 	if err != nil {
 		return "", fmt.Errorf("malformed input hex string: %x", inputHex1)
@@ -42,11 +43,12 @@ func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
 	}
 
 	if len(decoded1) != len(decoded2) {
-		return "", fmt.Errorf("decoded bytes are of different lengths, but must be equal")
+		err := errors.New("decoded bytes are of different lengths")
+		return "", err
 	}
 
-	// we could reuse decoded1 to save an allocation, but I think creating a separate slice makes
-	// the code clearer.
+	// we could reuse decoded1 to save an allocation, but I think creating a
+	// separate slice makes the code clearer.
 	result := make([]byte, len(decoded1))
 	for i := range decoded1 {
 		result[i] = decoded1[i] ^ decoded2[i]
@@ -55,37 +57,39 @@ func XORHexStrings(inputHex1, inputHex2 string) (string, error) {
 	return hex.EncodeToString(result), nil
 }
 
-// Challenge 3 of Set 1.
+// Challenge 3 and 4 of Set 1.
 // SingleByteXOR attempts to decrypt a given ciphertext by XORing it against
 // each 255 1-byte keys. It then checks which resulting plaintext has character
 // frequencies closest to typical English text.
 func SingleByteXOR(cipherText []byte) (string, byte) {
 	var (
 		bestScore float64
-		plainText string
+		plainText []byte
 		key       byte
 	)
-	for char := 0; char <= 255; char++ {
+
+	const asciiBytes = 256
+	for char := range asciiBytes {
 		decrypted := xorWithChar(cipherText, byte(char))
-		score := computeScore(decrypted)
+		score := computeTextScore(decrypted)
 
 		if score > bestScore {
 			bestScore = score
-			plainText = string(decrypted)
+			plainText = decrypted
 			key = byte(char)
 		}
 	}
 
-	return plainText, key
+	return string(plainText), key
 }
 
 // Challenge 5 of Set 1.
 // RepeatingKeyXOR encrypts the given text using a repeating-key XOR operation.
-// The function takes in a plain text and a key as input. Each byte of the text is XORed
-// with a corresponding byte from the key. If the length of the text exceeds the length of
-// the key, the key is repeated cyclically.
-// For example, if the text is "HELLO" and the key is "AB", the effective key used for
-// encryption would be "ABABA".
+// The function takes in a plain text and a key as input. Each byte of the text
+// is XORed with a corresponding byte from the key. If the length of the text
+// exceeds the length of the key, the key is repeated cyclically.
+// For example, if the text is "HELLO" and the key is "AB", the effective key
+// used for encryption would be "ABABA".
 func RepeatingKeyXOR(plainText, key []byte) []byte {
 	var (
 		cipherText = make([]byte, len(plainText))
@@ -99,7 +103,19 @@ func RepeatingKeyXOR(plainText, key []byte) []byte {
 }
 
 // Challenge 6 of Set 1.
-func BreakRepeatingKeyXOR(cipherText []byte, maxKeySize uint) (string, string, error) {
+// TL;DR:
+// 1. Determine the probable key size using statistical analysis.
+// 2. Transpose the cipher text by aligning bytes encrypted with the same key
+// byte.
+// 3. Recover the decryption key with frequency analysis on each transposed
+// block to determine the key's byte used to encrypt that particular block.
+// 4. Decrypt the cipher text
+// Returns the decrypted text, the key used to encrypt/decrypt it, and an error
+// (if any).
+func BreakRepeatingKeyXOR(
+	cipherText []byte,
+	maxKeySize int,
+) (string, string, error) {
 
 	keySize, err := estimateKeySize(cipherText, maxKeySize)
 	if err != nil {
@@ -107,60 +123,96 @@ func BreakRepeatingKeyXOR(cipherText []byte, maxKeySize uint) (string, string, e
 	}
 
 	var (
-		cipherTextLen = uint(len(cipherText))
+		cipherTextLen = len(cipherText)
 		transposed    = make([]byte, cipherTextLen)
 
-		// if the cipher-text length isn't a multiple of the key's size, there will be one
-		// last block of length < keySize which we need to consider.
-		// By adding keySize - 1 before the division, we're "rounding up" the number of
-		// blocks, thus giving us the correct number of blocks even if there's a remainder.
+		// if the cipher-text length isn't a multiple of the key's size, there
+		// will be one last block of length < keySize which we need to consider.
+		// By adding (keySize - 1) before the division, we're "rounding up" the
+		// number of blocks, thus giving us the correct number of blocks even
+		// if there's a remainder.
 		nBlocks = (cipherTextLen + keySize - 1) / keySize
 	)
 
 	// Loop through all indices of the input cipherText.
-	// Now that we have an estimation of the key's size, we break the ciphertext into
-	// blocks of keySize length and transpose them.
-	for index := uint(0); index < cipherTextLen; index++ {
+	// Now that we have an estimation of the key's size, we break the
+	// ciphertext into blocks of keySize length and transpose them.
+	// The ciphertext is a sequence of bytes where each byte is encrypted using
+	// a corresponding byte of the key. For example, with a key of size 3, the
+	// 1st, 4th, 7th bytes, etc., are all XORed against the first byte of the
+	// key, the 2nd, 5th, 8th bytes against the second byte of the key, and so
+	// on.
+	// To break the cipher, we have to analyze all bytes encrypted with the
+	// same key's byte together. This requires transposing the ciphertext so
+	// that all bytes encrypted by the first byte of the key are in the first
+	// "column", all bytes encrypted by the second byte of the key are in the
+	// second "column" and so on.
+	for index, char := range cipherText {
 		var (
-			byteIdx  = index % keySize // the position within a block.
-			blockIdx = index / keySize // the block number.
+			// The position of this byte within its block of the transposed
+			// cipher text. It determines which byte of the key was used to
+			// encrypt this particular byte of the cipher text.
+			// For example, for a key size of 3, byte positions 0, 3, 6,...
+			// will have byteIdx as 0; positions 1, 4, 7,... will have byteIdx
+			// 1, and so on.
+			byteIdx = index % keySize
 
-			// Compute the transposedIndex by treating the cipherText as a 2D matrix
-			// where byteIdx is the row and blockIdx is the column. We then transpose
-			// this matrix by switching the rows and columns.
+			// The index of the block of the transposed cipher text in which
+			// this byte is located.
+			blockIdx = index / keySize
+
+			// We are treating the transposed cipher text as a 2D matrix where
+			// byteIdx is the row and blockIdx is the column.
+			// That is, this is the index of this byte in the transposed matrix
+			// where each row represents a position in the key, and each column
+			// represents a sequential block of key-sized length.
 			transposedIndex = byteIdx*nBlocks + blockIdx
 		)
 
-		// Handle the case where we would be out-of-bounds due to an incomplete last block.
-		// We need to adjust the transposedIndex to ensure we don't go out of range.
+		// Handle the case where we would be out-of-bounds due to an incomplete
+		// last block. We need to adjust the transposedIndex to ensure we don't
+		// go out of range.
 		if transposedIndex >= cipherTextLen {
+			var (
+				// the current row in the transposed blocks.
+				currRow = byteIdx + 1
 
-			// byteIdx + 1: the current row in the transposed blocks.
-			// keySize - cipherTextLen%keySize: Calculates how many bytes are missing in
-			// the last, incomplete block.
-			// By multiplying these two, we calculate the total number of "missing"
-			// positions up to the current row.
-			// Subtracting this from transposedIndex adjusts our index to account for the
-			// absence of these positions in the transposed blocks.
-			transposedIndex -= (byteIdx + 1) * (keySize - cipherTextLen%keySize)
+				// how many bytes are missing in the last, incomplete block.
+				missingBytesInLastBlock = keySize - cipherTextLen%keySize
+			)
+
+			// By multiplying these two, we calculate the total number of
+			// "missing" positions up to the current row.
+			// Subtracting this from transposedIndex adjusts our index to
+			// account for the absence of these positions in the transposed
+			// blocks.
+			transposedIndex -= currRow * missingBytesInLastBlock
 		}
 
-		transposed[transposedIndex] = cipherText[index]
+		transposed[transposedIndex] = char
 	}
 
 	// Put together the decryption key.
-	// For each block in the transposed cipher-text, the single-byte XOR key that produces
-	// the best looking histogram is the repeating-key XOR key byte for that block.
+	// For each block in the transposed cipher-text, the single-byte XOR key
+	// that produces the best looking histogram is the repeating-key XOR key
+	// byte for that block.
 	decryptionKey := make([]byte, keySize)
-	for k := uint(0); k < keySize; k++ {
+	for k := range keySize {
 
-		// Define the start and end indices of the transposed block.
+		// Define the start and end indices of the transposed block that
+		// corresponds to the k-th byte of the key.
+		// That is, this block contains all the bytes that were XORed with the
+		// same byte of the key during encryption.
 		blockStart := k * nBlocks
+
+		// remember that this is the transposed matrix, therefore each row has
+		// nBlocks columns.
 		blockEnd := blockStart + nBlocks
 
-		// Ensure we don't go beyond the end of the transposed slice.
-		if blockEnd > uint(len(transposed)) {
-			blockEnd = uint(len(transposed))
+		// Ensure we don't go beyond the end of the transposed slice, which can
+		// happen if the last block is not full.
+		if blockEnd > len(transposed) {
+			blockEnd = len(transposed)
 		}
 
 		block := transposed[blockStart:blockEnd]
@@ -174,7 +226,7 @@ func BreakRepeatingKeyXOR(cipherText []byte, maxKeySize uint) (string, string, e
 	return string(plainText), string(decryptionKey), nil
 }
 
-// xorWithChar decrypts a byte slice by XORing each byte with the provided character.
+// xorWithChar XORs each byte of data with the provided character.
 func xorWithChar(data []byte, char byte) []byte {
 	result := make([]byte, len(data))
 	for i, b := range data {
@@ -183,20 +235,21 @@ func xorWithChar(data []byte, char byte) []byte {
 	return result
 }
 
-// computeScore calculates and returns a score for the given data based on how closely its
-// character frequencies match typical English text. A higher score indicates a closer
-// match to English.
-func computeScore(data []byte) float64 {
+// computeTextScore calculates and returns a score for the given text based on
+// how closely its character frequencies match typical English text. A higher
+// score indicates a closer match to valid English.
+func computeTextScore(data []byte) float64 {
 	const uppercaseToLowercaseShift = 'a' - 'A'
 	var (
-		// we use [utf8.RuneCountInString] instead of len(text) because len(text) returns
-		// the number of *bytes*. However, recall that in UTF-8 some characters are
-		// encoded using 2 bytes, therefore len(text) could return a number which is
-		// higher than the actual number of characters in the text. In contrast
-		// [utf8.RuneCountInString] returns the exact number of *characters* in the text,
-		// which is what we want here.
-		totalChars = float64(utf8.RuneCount(data))
-		score      float64
+		// we use [utf8.RuneCountInString] instead of len(text) because
+		// len(text) returns the number of *bytes*. However, recall that in
+		// UTF-8 some characters are encoded using 2 bytes, therefore len(text)
+		// could return a number which is higher than the actual number of
+		// characters in the text. In contrast [utf8.RuneCountInString] returns
+		// the exact number of *characters* in the text, which is what we want
+		// here.
+		nChars = float64(utf8.RuneCount(data))
+		score  float64
 	)
 
 	for _, b := range data {
@@ -212,70 +265,79 @@ func computeScore(data []byte) float64 {
 	}
 
 	// Normalization: a longer text will have a higher score because it has more
-	// characters. By normalizing, we adjust for the length of the text, making scores
-	// from different text lengths comparable.
-	// By doing this, the function calculates the average score per character, giving
-	// metric that represents the "English-likeness" of the text on a per-character basis.
-	return score / totalChars
+	// characters. By normalizing, we adjust for the length of the text, making
+	// scores from different text lengths comparable.
+	// By doing this, the function calculates the average score per character,
+	// giving a metric that represents the "English-likeness" of the text on a
+	// per-character basis.
+	return score / nChars
 }
 
 // hammingDistance computes the Hamming distance between two byte slices.
-// The Hamming distance is the number of differing bits between two binary representations.
+// The Hamming distance is the number of differing bits between two binary
+// representations.
 func hammingDistance(a, b []byte) (int, error) {
 	if len(a) != len(b) {
 		return 0, fmt.Errorf("byte slices are of different lengths")
 	}
 
-	distance := 0
+	var distance int
 	for i := range a {
-		// XOR the bytes: The result has a '1' bit wherever the two original bytes differ.
-		xorResult := a[i] ^ b[i]
+		// XOR the bytes: The result has a '1' bit wherever the two original
+		// bytes differ.
+		xor := a[i] ^ b[i]
 
 		// Count the number of set bits in the XOR result, adding to the total.
-		distance += bits.OnesCount8(xorResult)
+		distance += bits.OnesCount8(xor)
 	}
 
 	return distance, nil
 }
 
-// estimateKeySize tries to deduce the most probable key size for a given ciphertext.
-// It uses the method of computing normalized Hamming distances between blocks of bytes in
-// the ciphertext. This function takes in a ciphertext and a maximum key size to consider.
+// estimateKeySize tries to deduce the most probable key size for a given
+// ciphertext.
+// It computes the normalized Hamming distances between blocks of bytes of the
+// ciphertext. The key size producing the smaller Hamming distance between
+// blocks is the most likely key size used to encrypt the ciphertext.
+// This function takes in a ciphertext and a maximum key size to consider.
 // It returns the guessed key size and any potential error encountered.
-func estimateKeySize(cipherText []byte, maxKeySize uint) (uint, error) {
+func estimateKeySize(cipherText []byte, maxKeySize int) (int, error) {
 	var (
-		cipherTextLen = uint(len(cipherText))
+		cipherTextLen = len(cipherText)
 		minEditDist   = math.MaxFloat64
-		keySizeGuess  uint
-		eg            errgroup.Group
+		keySizeGuess  int
+		errG          errgroup.Group
 		mu            sync.Mutex
 	)
 
-	// the loop condition keySize*2 < cipherTextLen is there to ensure we can have at
-	// least two blocks of cipher-text to compare using the Hamming distance.
-	for keySize := uint(2); keySize <= maxKeySize && keySize*2 < cipherTextLen; keySize++ {
+	// the loop condition size*2 < cipherTextLen is there to ensure we can
+	// have at least two blocks of cipher-text to compare using the Hamming
+	// distance.
+	for size := 2; size <= maxKeySize && size*2 < cipherTextLen; size++ {
 
-		k := keySize
-		eg.Go(func() error {
+		k := size
+		errG.Go(func() error {
 
-			// Calculate the number of pairs of blocks we can compare for this key size.
+			// Calculate the number of pairs of blocks we can compare for this
+			// key size.
 			nPairs := cipherTextLen / (2 * k)
 
-			var totEditDist float64
-			for pair := uint(0); pair < nPairs; pair++ {
+			var totEditDist int
+			for pair := range nPairs {
 				var (
 					// blockA's start index is calculated as pair*2*k.
 					// Each pair covers 2*k bytes in the ciphertext.
-					// So, for the n-th pair, blockA begins at the start of this 2*k-byte
-					// range and occupies the first k bytes.
-					// For example, for the first pair (pair=0), blockA covers bytes from
-					// position 0 to k-1.
+					// So, for the n-th pair, blockA starts at 2*k and occupies
+					// the first k bytes.
+					// For example, for the first pair (pair=0), blockA covers
+					// bytes from position 0 to k-1.
 					blockA = cipherText[pair*2*k : (pair*2+1)*k]
 
-					// blockB's start index is (pair*2+1)*k, which is immediately after
-					// blockA's end index.
+					// blockB's start index is (pair*2+1)*k, which is
+					// immediately after blockA's end index.
 					// It covers the next k bytes in the ciphertext.
-					// So, for the first pair, this would be from position k to 2k-1.
+					// So, for the first pair, this would be from position k to
+					// 2k-1.
 					blockB = cipherText[(pair*2+1)*k : (pair*2+2)*k]
 				)
 				editDist, err := hammingDistance(blockA, blockB)
@@ -283,11 +345,11 @@ func estimateKeySize(cipherText []byte, maxKeySize uint) (uint, error) {
 					return fmt.Errorf("key length %d: %s", k, err)
 				}
 
-				totEditDist += float64(editDist)
+				totEditDist += editDist
 			}
 
 			var (
-				avgEditDist        = totEditDist / float64(nPairs)
+				avgEditDist        = float64(totEditDist) / float64(nPairs)
 				normalizedEditDist = avgEditDist / float64(k)
 			)
 
@@ -304,7 +366,7 @@ func estimateKeySize(cipherText []byte, maxKeySize uint) (uint, error) {
 		})
 	}
 
-	if err := eg.Wait(); err != nil {
+	if err := errG.Wait(); err != nil {
 		return 0, fmt.Errorf("estimating key length: %s", err)
 	}
 

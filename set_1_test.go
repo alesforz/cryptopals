@@ -42,6 +42,7 @@ func TestXORHexStrings(t *testing.T) {
 
 func TestSingleByteXOR(t *testing.T) {
 	hexStr := "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
+
 	cipherText, err := decodeTestHex(t, hexStr)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -76,7 +77,7 @@ func TestSingleByteXORFile(t *testing.T) {
 
 		gotStr, gotKey := SingleByteXOR(cipherText)
 
-		score := computeScore([]byte(gotStr))
+		score := computeTextScore([]byte(gotStr))
 		if score > bestScore {
 			bestScore = score
 			plainText = gotStr
@@ -92,6 +93,7 @@ func TestSingleByteXORFile(t *testing.T) {
 	t.Logf("Decoded string: %s", plainText)
 }
 
+// Challenge 5 of Set 1.
 func TestRepeatingKeyXOR(t *testing.T) {
 	var (
 		inputText = []byte(`Burning 'em, if you ain't quick and nimble
@@ -126,7 +128,7 @@ func TestBreakRepeatingKeyXOR(t *testing.T) {
 	}
 	decoded = decoded[:bytesWritten]
 
-	var maxKeySize uint = 40
+	var maxKeySize = 40
 	plainText, key, err := BreakRepeatingKeyXOR(decoded, maxKeySize)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
