@@ -1,3 +1,4 @@
 # cryptopals
 My solution to the Matasano Cryptopals challenges.
-Publishing the code in small waves, as I make it "human-readable" behind the scenes :P
+
+Solved up to and including the [Detect AES in ECB mode](https://cryptopals.com/sets/1/challenges/8) challenge.
