@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/aes"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -103,7 +104,7 @@ func RepeatingKeyXOR(plainText, key []byte) []byte {
 }
 
 // Challenge 6 of Set 1.
-// TL;DR:
+// BreakRepeatingKeyXOR:
 // 1. Determine the probable key size using statistical analysis.
 // 2. Transpose the cipher text by aligning bytes encrypted with the same key
 // byte.
@@ -224,6 +225,48 @@ func BreakRepeatingKeyXOR(
 	plainText := RepeatingKeyXOR(cipherText, decryptionKey)
 
 	return string(plainText), string(decryptionKey), nil
+}
+
+// Challenge 7 of Set 1.
+// DecryptAESECB decrypts a cipher text encrypted using AES-128 in ECB mode with
+// the given key.
+func DecryptAESECBString(cipherText, key string) (string, error) {
+	plainText, err := DecryptAESECB([]byte(cipherText), []byte(key))
+	return string(plainText), err
+}
+
+// Challenge 7 of Set 1.
+// DecryptAESECB decrypts a cipher text encrypted using AES-128 in ECB mode with
+// the given key.
+func DecryptAESECB(cipherText, key []byte) ([]byte, error) {
+	var (
+		cipherTextLen = len(cipherText)
+		keyLen        = len(key)
+	)
+	if cipherTextLen%keyLen != 0 {
+		const formatStr = "cipher text length %d is not a multiple of the key size %d"
+		return nil, fmt.Errorf(formatStr, cipherTextLen, keyLen)
+	}
+
+	aesCipher, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("instantiating AES ECB cipher: %w", err)
+	}
+
+	var (
+		blockSize = aesCipher.BlockSize()
+		nBlocks   = (cipherTextLen + blockSize - 1) / blockSize
+		plainText = make([]byte, cipherTextLen)
+	)
+	for b := range nBlocks {
+		var (
+			start = b * blockSize
+			end   = start + blockSize
+		)
+		aesCipher.Decrypt(plainText[start:end], cipherText[start:end])
+	}
+
+	return plainText, nil
 }
 
 // xorWithChar XORs each byte of data with the provided character.

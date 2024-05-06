@@ -109,6 +109,7 @@ I go crazy when I hear a cymbal`)
 	}
 }
 
+// Challenge 6 of Set 1.
 func TestBreakRepeatingKeyXOR(t *testing.T) {
 	f, err := os.Open("./files/1_6.txt")
 	if err != nil {
@@ -116,20 +117,14 @@ func TestBreakRepeatingKeyXOR(t *testing.T) {
 	}
 	defer f.Close()
 
-	cipherText, err := io.ReadAll(f)
+	decoder := base64.NewDecoder(base64.StdEncoding, f)
+	cipherText, err := io.ReadAll(decoder)
 	if err != nil {
 		t.Fatalf("reading file: %s", err)
 	}
 
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(cipherText)))
-	bytesWritten, err := base64.StdEncoding.Decode(decoded, cipherText)
-	if err != nil {
-		t.Fatalf("decoding file contents from base64: %s", err)
-	}
-	decoded = decoded[:bytesWritten]
-
 	var maxKeySize = 40
-	plainText, key, err := BreakRepeatingKeyXOR(decoded, maxKeySize)
+	plainText, key, err := BreakRepeatingKeyXOR(cipherText, maxKeySize)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -137,6 +132,29 @@ func TestBreakRepeatingKeyXOR(t *testing.T) {
 	t.Logf("Key: %s", key)
 	t.Logf("Key Size: %d", len(key))
 	t.Logf("Plain-text:\n%s", plainText)
+}
+
+// Challenge 7 of Set 1.
+func TestDecryptAESECB(t *testing.T) {
+	f, err := os.Open("./files/1_7.txt")
+	if err != nil {
+		t.Fatalf("opening file: %s", err)
+	}
+	defer f.Close()
+
+	decoder := base64.NewDecoder(base64.StdEncoding, f)
+	cipherText, err := io.ReadAll(decoder)
+	if err != nil {
+		t.Fatalf("reading file: %s", err)
+	}
+
+	const key = "YELLOW SUBMARINE"
+	plainText, err := DecryptAESECB(cipherText, []byte(key))
+	if err != nil {
+		t.Error(err)
+	}
+
+	t.Log(string(plainText))
 }
 
 func TestHammingDistance(t *testing.T) {
