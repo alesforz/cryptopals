@@ -149,7 +149,7 @@ func TestDecryptAESECB(t *testing.T) {
 	}
 
 	const key = "YELLOW SUBMARINE"
-	plainText, err := decryptAESECB(cipherText, []byte(key))
+	plainText, err := encryptAESECB(cipherText, []byte(key))
 	if err != nil {
 		t.Error(err)
 	}
