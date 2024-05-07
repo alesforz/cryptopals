@@ -33,8 +33,11 @@ func padPkcs7(block []byte, targetLen int) []byte {
 	return padded
 }
 
+// encryptAesCbc encrypts a plain text using AES in CBC mode using the given
+// key and initialization vector.
 // In case of an error during encryption, it returns the error and the cipher
 // text generated up to when the error occurred.
+// Challenge 10 of Set 2.
 func encryptAesCbc(plainText, key, iv []byte) ([]byte, error) {
 	var (
 		ivLen  = len(iv)
@@ -66,18 +69,78 @@ func encryptAesCbc(plainText, key, iv []byte) ([]byte, error) {
 
 	for b := 1; b < nBlocks; b++ {
 		var (
-			prevBlock = plainText[(b-1)*blockSize : (b-1)*blockSize+blockSize]
-			currBlock = plainText[b*blockSize : b*blockSize+blockSize]
+			prevBlockStart = (b - 1) * blockSize
+			prevBlockEnd   = (b-1)*blockSize + blockSize
+			prevBlock      = cipherText[prevBlockStart:prevBlockEnd]
+
+			currBlockStart = b * blockSize
+			currBlockEnd   = b*blockSize + blockSize
+			currBlock      = plainText[currBlockStart:currBlockEnd]
 		)
-		block, err := xorBlocks(prevBlock, currBlock)
+		cipherTextBlock, err := xorBlocks(prevBlock, currBlock)
 		if err != nil {
 			const formatStr = "xor plain text blocks %d and %d: %s"
-			return cipherText, fmt.Errorf(formatStr, b-1, b, err)
+			return cipherText[:prevBlockEnd], fmt.Errorf(formatStr, b-1, b, err)
 		}
-		cipherText = append(cipherText, encrypter(block)...)
+		cipherText = append(cipherText, encrypter(cipherTextBlock)...)
 	}
 
 	return cipherText, nil
+}
+
+// decryptAesCbc decrypts a cipher text using AES in CBC mode using the given
+// key and initialization vector.
+// In case of an error during decryption, it returns the error and the plain
+// text decrypted up to when the error occurred.
+// Challenge 10 of Set 2.
+func decryptAesCbc(cipherText, key, iv []byte) ([]byte, error) {
+	var (
+		ivLen  = len(iv)
+		keyLen = len(key)
+	)
+	if ivLen%keyLen != 0 {
+		const formatStr = "initialization vector length %d is not a multiple of the key size %d"
+		return nil, fmt.Errorf(formatStr, ivLen, keyLen)
+	}
+
+	decrypter, err := aesDecrypter(cipherText, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		blockSize     = keyLen
+		cipherTextLen = len(cipherText)
+		nBlocks       = (cipherTextLen + blockSize - 1) / blockSize
+		plainText     = make([]byte, 0, cipherTextLen)
+	)
+	// The first plaintext block, which has no associated previous ciphertext
+	// block, is xored with the initialization vector.
+	firstBlock, err := xorBlocks(decrypter(cipherText[:blockSize]), iv)
+	if err != nil {
+		return nil, fmt.Errorf("xor first plain text block with IV: %s", err)
+	}
+	plainText = append(plainText, firstBlock...)
+
+	for b := 1; b < nBlocks; b++ {
+		var (
+			prevBlockStart = (b - 1) * blockSize
+			prevBlockEnd   = (b-1)*blockSize + blockSize
+			prevBlock      = cipherText[prevBlockStart:prevBlockEnd]
+
+			currBlockStart = b * blockSize
+			currBlockEnd   = b*blockSize + blockSize
+			currBlock      = decrypter(cipherText[currBlockStart:currBlockEnd])
+		)
+		plainTextBlock, err := xorBlocks(prevBlock, currBlock)
+		if err != nil {
+			const formatStr = "xor plain text blocks %d and %d: %s"
+			return plainText[:prevBlockEnd], fmt.Errorf(formatStr, b-1, b, err)
+		}
+		plainText = append(plainText, plainTextBlock...)
+	}
+
+	return plainText, nil
 }
 
 // encryptAesEcbString is a wrapper of encryptAesEcb for when you have a plain
