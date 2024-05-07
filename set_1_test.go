@@ -135,7 +135,7 @@ func TestBreakRepeatingKeyXOR(t *testing.T) {
 }
 
 // Challenge 7 of Set 1.
-func TestDecryptAESECB(t *testing.T) {
+func TestDecryptAesEcb(t *testing.T) {
 	f, err := os.Open("./files/1_7.txt")
 	if err != nil {
 		t.Fatalf("opening file: %s", err)
@@ -149,7 +149,7 @@ func TestDecryptAESECB(t *testing.T) {
 	}
 
 	const key = "YELLOW SUBMARINE"
-	plainText, err := encryptAESECB(cipherText, []byte(key))
+	plainText, err := decryptAesEcb(cipherText, []byte(key))
 	if err != nil {
 		t.Error(err)
 	}
@@ -158,7 +158,7 @@ func TestDecryptAESECB(t *testing.T) {
 }
 
 // Challenge 8 of set 1.
-func TestDetectAESECB(t *testing.T) {
+func TestDetectAesEcb(t *testing.T) {
 	f, err := os.Open("./files/1_8.txt")
 	if err != nil {
 		t.Fatalf("opening file: %s", err)
@@ -178,7 +178,7 @@ func TestDetectAESECB(t *testing.T) {
 		if err != nil {
 			t.Errorf("decoding cipher text %d: %x from hex", count, cipherText)
 		}
-		if isEncryptedAESECB(decoded) {
+		if isEncryptedAesEcb(decoded) {
 			t.Logf("cipher text %d is encrypted using AES ECB", count)
 			break
 		}

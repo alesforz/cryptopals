@@ -4,11 +4,11 @@ import (
 	"testing"
 )
 
-func TestPadPKCS7(t *testing.T) {
+func TestPadPkcs7(t *testing.T) {
 	data := []byte("YELLOW SUBMARINE")
 
 	// pad "YELLOW SUBMARINE" (16 bytes) to 20 bytes
-	padded := padPKCS7(data, 20)
+	padded := padPkcs7(data, 20)
 
 	const want = "YELLOW SUBMARINE\x04\x04\x04\x04"
 	if string(padded) != want {
@@ -16,18 +16,18 @@ func TestPadPKCS7(t *testing.T) {
 	}
 }
 
-func TestAESECBEncryption(t *testing.T) {
+func TestAesEcbEncryption(t *testing.T) {
 	var (
 		plainText = "Lorem ipsum dolor sit amet consectetur adipiscin"
 		key       = "YELLOW SUBMARINE"
 	)
 
-	cipherText, err := encryptAESECBString(plainText, key)
+	cipherText, err := encryptAesEcbString(plainText, key)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	decrypted, err := decryptAESECBString(cipherText, key)
+	decrypted, err := decryptAesEcbString(cipherText, key)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}

@@ -220,59 +220,51 @@ func breakRepeatingKeyXOR(
 	return string(plainText), string(decryptionKey), nil
 }
 
-// decryptAESECBString is a wrapper of decryptAESECB for when you have a cipher
+// decryptAesEcbString is a wrapper of decryptAesEcb for when you have a cipher
 // text to decrypt and a key to decrypt it as strings.
-func decryptAESECBString(cipherText, key string) (string, error) {
-	plainText, err := decryptAESECB([]byte(cipherText), []byte(key))
+func decryptAesEcbString(cipherText, key string) (string, error) {
+	plainText, err := decryptAesEcb([]byte(cipherText), []byte(key))
 	return string(plainText), err
 }
 
-// decryptAESECB decrypts a cipher text encrypted using AES-128 in ECB mode with
+// decryptAesEcb decrypts a cipher text encrypted using AES-128 in ECB mode with
 // the given key.
 // Challenge 7 of Set 1.
-func decryptAESECB(cipherText, key []byte) ([]byte, error) {
-	var (
-		cipherTextLen = len(cipherText)
-		keyLen        = len(key)
-	)
-	if cipherTextLen%keyLen != 0 {
-		const formatStr = "cipher text length %d is not a multiple of the key size %d"
-		return nil, fmt.Errorf(formatStr, cipherTextLen, keyLen)
-	}
-
-	aesCipher, err := aes.NewCipher(key)
+func decryptAesEcb(cipherText, key []byte) ([]byte, error) {
+	decrypter, err := aesDecrypter(cipherText, key)
 	if err != nil {
-		return nil, fmt.Errorf("instantiating AES ECB cipher: %w", err)
+		return nil, err
 	}
 
 	var (
-		blockSize = aesCipher.BlockSize()
-		nBlocks   = (cipherTextLen + blockSize - 1) / blockSize
-		plainText = make([]byte, cipherTextLen)
+		blockSize     = len(key)
+		cipherTextLen = len(cipherText)
+		nBlocks       = (cipherTextLen + blockSize - 1) / blockSize
+		plainText     = make([]byte, 0, cipherTextLen)
 	)
 	for b := range nBlocks {
 		var (
 			start = b * blockSize
 			end   = start + blockSize
 		)
-		aesCipher.Decrypt(plainText[start:end], cipherText[start:end])
+		plainText = append(plainText, decrypter(cipherText[start:end])...)
 	}
 
 	return plainText, nil
 }
 
-// isEncryptedAESECBString is a wrapper around isEncryptedAESECB for when you
+// isEncryptedAesEcbString is a wrapper around isEncryptedAesEcb for when you
 // have a cipher text to decrypt as a string.
-func isEncryptedAESECBString(cipherText string) bool {
-	return isEncryptedAESECB([]byte(cipherText))
+func isEncryptedAesEcbString(cipherText string) bool {
+	return isEncryptedAesEcb([]byte(cipherText))
 }
 
-// isEncryptedAESECB returns true if the given cipherText was encrypted using
+// isEncryptedAesEcb returns true if the given cipherText was encrypted using
 // AES ECB. It leverages the fact that ECB is stateless and deterministic; the
 // same 16 byte plaintext block will always produce the same 16 byte
 // ciphertext.
 // Challenge 8 of Set 1.
-func isEncryptedAESECB(cipherText []byte) bool {
+func isEncryptedAesEcb(cipherText []byte) bool {
 	const blockSize = aes.BlockSize
 
 	cipherTextLen := len(cipherText)
