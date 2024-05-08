@@ -2,32 +2,32 @@ package main
 
 import (
 	"crypto/aes"
+	crand "crypto/rand"
 	"fmt"
+	mrand "math/rand/v2"
 )
 
-// padPkcs7 pads any block to a specific block size by appending the number of
-// bytes of padding to the end of the block.
+// padPkcs7 pads the given data to a multiple of size by appending the number of
+// bytes of padding to the end of the it.
 // For instance, "YELLOW SUBMARINE" (16 bytes) padded to 20 bytes would be:
 // "YELLOW SUBMARINE\x04\x04\x04\x04"
-// If targetLen >=256, it will return a padded block of size 255 bytes.
+// If targetLen >=256, it will pad to size 255.
 // Challenge 9 from set 2.
-func padPkcs7(block []byte, targetLen int) []byte {
-	blockLen := len(block)
-	if targetLen <= blockLen {
-		// can't pad a block to a size <= than itself.
-		return block
-	}
-	if targetLen >= 256 {
+func padPkcs7(data []byte, size int) []byte {
+	dataLen := len(data)
+	if size >= 256 {
 		// can't fit numbers >= 256 in one byte of padding.
-		targetLen = 255
+		size = 255
 	}
 
-	padded := make([]byte, targetLen)
-	copy(padded, block)
+	var (
+		pad    = size - dataLen%size
+		padded = make([]byte, dataLen+pad)
+	)
+	copy(padded, data)
 
-	pad := byte(targetLen - blockLen)
-	for i := blockLen; i < targetLen; i++ {
-		padded[i] = pad
+	for i := dataLen; i < len(padded); i++ {
+		padded[i] = byte(pad)
 	}
 
 	return padded
@@ -48,16 +48,21 @@ func encryptAesCbc(plainText, key, iv []byte) ([]byte, error) {
 		return nil, fmt.Errorf(formatStr, ivLen, keyLen)
 	}
 
-	encrypter, err := aesEncrypter(plainText, key)
+	plainTextLen := len(plainText)
+	if plainTextLen%keyLen != 0 {
+		plainText = padPkcs7(plainText, keyLen)
+		plainTextLen = len(plainText)
+	}
+
+	encrypter, err := aesEncrypter(key)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		blockSize    = keyLen
-		plainTextLen = len(plainText)
-		nBlocks      = (plainTextLen + blockSize - 1) / blockSize
-		cipherText   = make([]byte, 0, plainTextLen)
+		blockSize  = keyLen
+		nBlocks    = (plainTextLen + blockSize - 1) / blockSize
+		cipherText = make([]byte, 0, plainTextLen)
 	)
 	// The first plaintext block, which has no associated previous ciphertext
 	// block, is added to the the initialization vector.
@@ -95,24 +100,29 @@ func encryptAesCbc(plainText, key, iv []byte) ([]byte, error) {
 // Challenge 10 of Set 2.
 func decryptAesCbc(cipherText, key, iv []byte) ([]byte, error) {
 	var (
-		ivLen  = len(iv)
-		keyLen = len(key)
+		cipherTextLen = len(cipherText)
+		keyLen        = len(key)
 	)
+	if cipherTextLen%keyLen != 0 {
+		const formatStr = "cipher text's length (%d) is not a multiple of the decryption key's length (%d)"
+		return nil, fmt.Errorf(formatStr, len(cipherText), len(key))
+	}
+
+	ivLen := len(iv)
 	if ivLen%keyLen != 0 {
 		const formatStr = "initialization vector length %d is not a multiple of the key size %d"
 		return nil, fmt.Errorf(formatStr, ivLen, keyLen)
 	}
 
-	decrypter, err := aesDecrypter(cipherText, key)
+	decrypter, err := aesDecrypter(key)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		blockSize     = keyLen
-		cipherTextLen = len(cipherText)
-		nBlocks       = (cipherTextLen + blockSize - 1) / blockSize
-		plainText     = make([]byte, 0, cipherTextLen)
+		blockSize = keyLen
+		nBlocks   = (cipherTextLen + blockSize - 1) / blockSize
+		plainText = make([]byte, 0, cipherTextLen)
 	)
 	// The first plaintext block, which has no associated previous ciphertext
 	// block, is xored with the initialization vector.
@@ -143,6 +153,33 @@ func decryptAesCbc(cipherText, key, iv []byte) ([]byte, error) {
 	return plainText, nil
 }
 
+// encryptionOracle generates a random AES key and returns an aesWorker that
+// encrypts with it.
+// Challenge 11 of set 2.
+func encryptionOracle(plainText []byte) ([]byte, error) {
+	padded, err := addRandomNoise(plainText)
+	if err != nil {
+		return nil, fmt.Errorf("secretly adding noise to plain text: %s", err)
+	}
+
+	key, err := randomBytes(aes.BlockSize, aes.BlockSize)
+	if err != nil {
+		return nil, fmt.Errorf("generating random AES key: %s", err)
+	}
+
+	if coinFlip := mrand.IntN(2); coinFlip == 0 {
+		return encryptAesEcb(padded, key)
+	}
+
+	iv, err := randomBytes(aes.BlockSize, aes.BlockSize)
+	if err != nil {
+		const formatStr = "generating random IV for AES CBC encryption: %s"
+		return nil, fmt.Errorf(formatStr, err)
+	}
+
+	return encryptAesCbc(padded, key, iv)
+}
+
 // encryptAesEcbString is a wrapper of encryptAesEcb for when you have a plain
 // text to encrypt and a key to encrypt it as strings.
 func encryptAesEcbString(plainText, key string) (string, error) {
@@ -153,17 +190,24 @@ func encryptAesEcbString(plainText, key string) (string, error) {
 // encryptAesEcb encrypts a plain text using AES-128 in ECB mode with the given
 // key.
 func encryptAesEcb(plainText, key []byte) ([]byte, error) {
+	var (
+		plainTextLen = len(plainText)
+		keyLen       = len(key)
+	)
+	if plainTextLen%keyLen != 0 {
+		plainText = padPkcs7(plainText, keyLen)
+		plainTextLen = len(plainText)
+	}
 
-	encrypter, err := aesEncrypter(plainText, key)
+	encrypter, err := aesEncrypter(key)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		blockSize    = len(key)
-		plainTextLen = len(plainText)
-		nBlocks      = (plainTextLen + blockSize - 1) / blockSize
-		cipherText   = make([]byte, 0, plainTextLen)
+		blockSize  = keyLen
+		nBlocks    = (plainTextLen + blockSize - 1) / blockSize
+		cipherText = make([]byte, 0, plainTextLen)
 	)
 	for b := range nBlocks {
 		var (
@@ -183,19 +227,11 @@ type aesWorker func([]byte) []byte
 // aesEncrypter initializes an AES encryption operation in ECB mode using the
 // provided key. It returns an aesWorker which performs the encryption of a
 // byte slice with the given key.
-func aesEncrypter(plainText, key []byte) (aesWorker, error) {
-	var (
-		plainTextLen = len(plainText)
-		keyLen       = len(key)
-	)
-	if plainTextLen%keyLen != 0 {
-		const formatStr = "plain text length %d is not a multiple of the key size %d"
-		return nil, fmt.Errorf(formatStr, plainTextLen, keyLen)
-	}
+func aesEncrypter(key []byte) (aesWorker, error) {
 
 	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("instantiating AES ECB cipher: %w", err)
+		return nil, fmt.Errorf("instantiating AES cipher: %w", err)
 	}
 
 	encrypter := func(plainText []byte) []byte {
@@ -210,19 +246,11 @@ func aesEncrypter(plainText, key []byte) (aesWorker, error) {
 // aesDecrypter initializes an AES decryption operation using the provided key.
 // It returns an AESECBWorker which performs the decryption of a byte slice
 // with the given key.
-func aesDecrypter(cipherText, key []byte) (aesWorker, error) {
-	var (
-		cipherTextLen = len(cipherText)
-		keyLen        = len(key)
-	)
-	if cipherTextLen%keyLen != 0 {
-		const formatStr = "cipher text length %d is not a multiple of the key size %d"
-		return nil, fmt.Errorf(formatStr, cipherTextLen, keyLen)
-	}
+func aesDecrypter(key []byte) (aesWorker, error) {
 
 	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("instantiating AES ECB cipher: %w", err)
+		return nil, fmt.Errorf("instantiating AES cipher: %w", err)
 	}
 
 	decrypter := func(cipherText []byte) []byte {
@@ -232,4 +260,38 @@ func aesDecrypter(cipherText, key []byte) (aesWorker, error) {
 	}
 
 	return decrypter, nil
+}
+
+// randomBytes generates returns a slice of size min <= x <= max (chosen
+// randomly) filled with random bytes.
+func randomBytes(min, max int) ([]byte, error) {
+	var (
+		nBytes = mrand.IntN(max-min+1) + min
+		buf    = make([]byte, nBytes)
+	)
+	if _, err := crand.Read(buf); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+// addRandomNoise prepends and appends random bytes to the given data.
+// It does not modify the input data slice.
+func addRandomNoise(data []byte) ([]byte, error) {
+	prefix, err := randomBytes(5, 10)
+	if err != nil {
+		return nil, err
+	}
+	suffix, err := randomBytes(5, 10)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, len(prefix)+len(data)+len(suffix))
+	copy(buf, prefix)
+	copy(buf[len(prefix):], data)
+	copy(buf[len(prefix)+len(data):], suffix)
+
+	return buf, nil
 }

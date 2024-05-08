@@ -231,16 +231,20 @@ func decryptAesEcbString(cipherText, key string) (string, error) {
 // the given key.
 // Challenge 7 of Set 1.
 func decryptAesEcb(cipherText, key []byte) ([]byte, error) {
-	decrypter, err := aesDecrypter(cipherText, key)
+	if len(cipherText)%len(key) != 0 {
+		const formatStr = "cipher text's length (%d) is not a multiple of the decryption key's length (%d)"
+		return nil, fmt.Errorf(formatStr, len(cipherText), len(key))
+	}
+
+	decrypter, err := aesDecrypter(key)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		blockSize     = len(key)
-		cipherTextLen = len(cipherText)
-		nBlocks       = (cipherTextLen + blockSize - 1) / blockSize
-		plainText     = make([]byte, 0, cipherTextLen)
+		blockSize = len(key)
+		nBlocks   = (len(cipherText) + blockSize - 1) / blockSize
+		plainText = make([]byte, 0, len(cipherText))
 	)
 	for b := range nBlocks {
 		var (

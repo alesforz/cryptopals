@@ -99,3 +99,28 @@ func TestAesCbcDecryption(t *testing.T) {
 
 	t.Log(string(plainText))
 }
+
+// Challenge 11 of Set 2
+func TestEncryptionOracle(t *testing.T) {
+	// we can choose the plaintext so, to distinguish between the 2 encryption
+	// modes, we use a plaintext that repeats itself. Remember that ECB
+	// produces the same ciphertext blocks given the same plaintext blocks.
+	var (
+		text               = []byte("Let's encrypt this stuff")
+		plainText          = bytes.Repeat(text, 5)
+		countECB, countCBC int
+	)
+	for i := 0; i < 1000; i++ {
+		cipherText, err := encryptionOracle(plainText)
+		if err != nil {
+			t.Fatalf("oracle returned: %s", err)
+		}
+		if isEncryptedAesEcb(cipherText) {
+			countECB++
+		} else {
+			countCBC++
+		}
+	}
+
+	t.Logf("Oracle used ECB %d and CBC %d times\n", countECB, countCBC)
+}

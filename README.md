@@ -1,4 +1,4 @@
 # cryptopals
 My solution to the Matasano Cryptopals challenges.
 
-Solved up to and including the [Implement CBC mode](https://cryptopals.com/sets/2/challenges/10) challenge.
+Solved up to and including the [An ECB/CBC detection oracle](https://cryptopals.com/sets/2/challenges/11) challenge.
