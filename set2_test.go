@@ -36,8 +36,8 @@ func TestAesEcbEncryption(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	if decrypted != plainText {
-		const formatStr = "original plain text and decrypted plain text differ:\noriginal:%s\ndecrypted: %s"
+	if delPadPkcs7String(decrypted) != plainText {
+		const formatStr = "original plain text and decrypted plain text differ:\noriginal: %q\ndecrypted: %q"
 
 		t.Errorf(formatStr, plainText, decrypted)
 	}
@@ -63,8 +63,8 @@ func TestAesCbcEncryption(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	if !bytes.Equal(decrypted, plainText) {
-		const formatStr = "original plain text and decrypted plain text differ:\noriginal:%s\ndecrypted: %s"
+	if !bytes.Equal(delPadPkcs7(decrypted), plainText) {
+		const formatStr = "original plain text and decrypted plain text differ:\noriginal: %q\ndecrypted: %q"
 
 		t.Errorf(formatStr, plainText, decrypted)
 	}
@@ -123,4 +123,27 @@ func TestEncryptionOracle(t *testing.T) {
 	}
 
 	t.Logf("Oracle used ECB %d and CBC %d times\n", countECB, countCBC)
+}
+
+// Challenge 12 of set 2.
+func TestDecryptOracleSecret(t *testing.T) {
+	// const secret = `Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK`
+
+	// decodedSecret, err := base64.StdEncoding.DecodeString(secret)
+	// if err != nil {
+	// 	t.Fatalf("decoding secret suffix: %s", err)
+	// }
+
+	const s = "YELLOW SUBMARINE+RED SUNSHINES=IMMENSE HAPPINESS"
+	o, err := ecbEncryptionOracle([]byte(s))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decryptedSecret, err := decryptOracleSecret(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(decryptedSecret)
+	t.Log(string(decryptedSecret))
 }
