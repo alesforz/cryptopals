@@ -209,7 +209,7 @@ func ecbEncryptionOracle(secret []byte) (oracle, error) {
 // feedback from the oracle to reveal the hidden data.
 // See file example_byte_at_a_time.txt for a visual example of this method.
 // Challenge 12 of set 2.
-func decryptOracleSecret(encOracle oracle) ([]byte, error) {
+func decryptOracleSecret(encryptionOracle oracle) ([]byte, error) {
 
 	var (
 		blockSize   = aes.BlockSize
@@ -235,7 +235,7 @@ func decryptOracleSecret(encOracle oracle) ([]byte, error) {
 	// (shortBlocks[0] stores an empty block, therefore the oracle will
 	// encrypt [{}||secret]).
 	// We do this to know the number of blocks we have to decrypt.
-	encryptedSecret, err := encOracle(shortBlocks[0])
+	encryptedSecret, err := encryptionOracle(shortBlocks[0])
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func decryptOracleSecret(encOracle oracle) ([]byte, error) {
 
 			// these could be cached, as the encryption of a given short block
 			// is always the same cipher text.
-			cipherText, err := encOracle(knownBytes)
+			cipherText, err := encryptionOracle(knownBytes)
 			if err != nil {
 				return secret, err
 			}
@@ -305,7 +305,7 @@ func decryptOracleSecret(encOracle oracle) ([]byte, error) {
 
 				forged[len(forged)-1] = char
 
-				sampleCipherText, err := encOracle(forged)
+				sampleCipherText, err := encryptionOracle(forged)
 				if err != nil {
 					const formatStr = "trying byte %d (%c): %s"
 					return secret, fmt.Errorf(formatStr, i, char, err)
