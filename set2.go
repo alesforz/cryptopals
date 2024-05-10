@@ -211,34 +211,46 @@ func ecbEncryptionOracle(secret []byte) (oracle, error) {
 // Challenge 12 of set 2.
 func decryptOracleSecret(encOracle oracle) ([]byte, error) {
 
-	// this will return a cipher text where only the secret string has been
-	// encrypted. We do this to know the number of blocks we have to decrypt.
-	encryptedSecret, err := encOracle(nil)
+	var (
+		blockSize   = aes.BlockSize
+		shortBlocks = make([][]byte, blockSize)
+	)
+	// craft blocks of known bytes shorter than a full AES block.
+	// These will push the unknown byte(s) of the secret into a predictable
+	// position within the ciphertext block.
+	// For example, if the block is of length 15 (blockSize - 1), the
+	// encrypted output will have the first 15 bytes as 'A' and the 16th byte
+	// will be the first byte of the secret. With length 14, the encrypted
+	// output will have the first 15 bytes as 'A' and the 15th and 16th will be
+	// the first 2 bytes of the secret.
+	for size := 0; size < blockSize; size++ {
+		block := make([]byte, size)
+		for i := range block {
+			block[i] = 'A'
+		}
+		shortBlocks[size] = block
+	}
+
+	// this will return a cipher text where only the secret has been encrypted
+	// (shortBlocks[0] stores an empty block, therefore the oracle will
+	// encrypt [{}||secret]).
+	// We do this to know the number of blocks we have to decrypt.
+	encryptedSecret, err := encOracle(shortBlocks[0])
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		blockSize = aes.BlockSize
-		nBlocks   = len(encryptedSecret) / blockSize
-		secret    = make([]byte, 0, len(encryptedSecret))
+		nBlocks = len(encryptedSecret) / blockSize
+		secret  = make([]byte, 0, len(encryptedSecret))
 	)
 	for blockIdx := range nBlocks {
 		for size := blockSize - 1; size >= 0; size-- {
-			// craft a block of known bytes shorter than a full AES block.
-			// This will push the unknown byte(s) of the secret into a
-			// predictable position within the ciphertext block.
-			// For example, if shortBlock is of length 15 (blockSize - 1), the
-			// encrypted output will have the first 15 bytes as 'A' and the
-			// 16th byte will be the first byte of the secret. With length 14,
-			// the encrypted output will have the first 15 bytes as 'A' and the
-			// 15th and 16th will be the first 2 bytes of the secret.
-			shortBlock := make([]byte, size)
-			for i := range size {
-				shortBlock[i] = 'A'
-			}
+			knownBytes := shortBlocks[size]
 
-			cipherText, err := encOracle(shortBlock)
+			// these could be cached, as the encryption of a given short block
+			// is always the same cipher text.
+			cipherText, err := encOracle(knownBytes)
 			if err != nil {
 				return secret, err
 			}
@@ -252,14 +264,14 @@ func decryptOracleSecret(encOracle oracle) ([]byte, error) {
 				// the cipher text block being targeted for decryption.
 				targetBlock = cipherText[start:end]
 
-				// a combination of known bytes (shortBlock), previously
+				// a combination of known bytes, previously
 				// decrypted bytes of the secret, and the byte currently being
 				// guessed (the +1, which we will brute force in the loop
 				// below).
-				forged = make([]byte, len(shortBlock)+len(secret)+1)
+				forged = make([]byte, len(knownBytes)+len(secret)+1)
 			)
-			copy(forged, shortBlock)
-			copy(forged[len(shortBlock):], secret)
+			copy(forged, knownBytes)
+			copy(forged[len(knownBytes):], secret)
 
 			// the "byte-at-a-time" part of the attack.
 			// This loop is responsible for guessing the value of the unknown
