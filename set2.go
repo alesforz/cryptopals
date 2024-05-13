@@ -178,10 +178,10 @@ func encryptionOracle(plainText []byte) ([]byte, error) {
 	return encryptAesCbc(padded, key, iv)
 }
 
-type oracle func([]byte) ([]byte, error)
+type aesOracle func([]byte) ([]byte, error)
 
 // Challenge 12 of set 2.
-func ecbEncryptionOracle(secret []byte) (oracle, error) {
+func ecbEncryptionOracle(secret []byte) (aesOracle, error) {
 	key, err := randomBytes(aes.BlockSize, aes.BlockSize)
 	if err != nil {
 		return nil, fmt.Errorf("generating random AES key: %s", err)
@@ -209,7 +209,7 @@ func ecbEncryptionOracle(secret []byte) (oracle, error) {
 // feedback from the oracle to reveal the hidden data.
 // See file example_byte_at_a_time.txt for a visual example of this method.
 // Challenge 12 of set 2.
-func decryptOracleSecret(encryptionOracle oracle) ([]byte, error) {
+func decryptOracleSecret(encryptionOracle aesOracle) ([]byte, error) {
 
 	var (
 		blockSize   = aes.BlockSize
