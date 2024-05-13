@@ -356,10 +356,6 @@ func encryptAesEcb(plainText, key []byte) ([]byte, error) {
 	return cipherText, nil
 }
 
-// aesWorker defines a type that performs an AES encryption/decryption
-// operation on the given data, and returns the result of that operation.
-type aesWorker func([]byte) []byte
-
 // aesEncrypter initializes an AES encryption operation in ECB mode using the
 // provided key. It returns an aesWorker which performs the encryption of a
 // byte slice with the given key.
@@ -377,25 +373,6 @@ func aesEncrypter(key []byte) (aesWorker, error) {
 	}
 
 	return encrypter, nil
-}
-
-// aesDecrypter initializes an AES decryption operation using the provided key.
-// It returns an AESECBWorker which performs the decryption of a byte slice
-// with the given key.
-func aesDecrypter(key []byte) (aesWorker, error) {
-
-	aesCipher, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, fmt.Errorf("instantiating AES cipher: %w", err)
-	}
-
-	decrypter := func(cipherText []byte) []byte {
-		plainText := make([]byte, len(cipherText))
-		aesCipher.Decrypt(plainText, cipherText)
-		return plainText
-	}
-
-	return decrypter, nil
 }
 
 // randomBytes generates returns a slice of size min <= x <= max (chosen

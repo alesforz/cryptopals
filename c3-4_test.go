@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/hex"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -57,4 +59,16 @@ func TestSingleByteXORFile(t *testing.T) {
 
 	t.Logf("Key: %c", key)
 	t.Logf("Decoded string: %s", plainText)
+}
+
+// decodeTestHex attempts to decode the provided hex string into a byte slice.
+func decodeTestHex(t *testing.T, hexStr string) ([]byte, error) {
+	t.Helper()
+
+	decodedHex, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, fmt.Errorf("malformed hex string '%s': %s", hexStr, err)
+	}
+
+	return decodedHex, nil
 }
