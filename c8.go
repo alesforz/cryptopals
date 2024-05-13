@@ -35,9 +35,3 @@ func isEncryptedAesEcb(cipherText []byte) bool {
 	}
 	return false
 }
-
-// isEncryptedAesEcbString is a wrapper around isEncryptedAesEcb for when you
-// have a cipher text to decrypt as a string.
-func isEncryptedAesEcbString(cipherText string) bool {
-	return isEncryptedAesEcb([]byte(cipherText))
-}
