@@ -1,71 +1,70 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
+	"math/rand"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 )
 
 // profileFor returns the encoding of a user formatted as a URL query.
 // e.g., given email "foo@bar.com", it returns
-// "email=foo@bar.com&uid=10&role=user"
+// "email=foo@bar.com&role=user&uid=10"
 func profileFor(email string) (string, error) {
 	if strings.ContainsAny(email, "&=") {
 		const errMsg = "invalid email address; can't contain '&' or '=' characters"
 		return "", errors.New(errMsg)
 	}
 
-	// must create it manually instead of using url.Values.Encode because that
-	// function percent-encodes special characters (i.e., it encodes '@' to
-	// '%40')
-	return "email=" + email + "&uid=42&role=user", nil
-}
+	v := url.Values{}
+	v.Set("email", email)
 
-// parseUser parses a user account in the form
-// "email=foo@bar.com&uid=10&role=user" and returns it JSON representation as
-// {"email":["foo@bar.com"], "uid":["10"], "role":["user"]}.
-func parseUser(user string) (string, error) {
-	v, err := url.ParseQuery(user)
-	if err != nil {
-		return "", fmt.Errorf("parsing user %s: %s", user, err)
-	}
+	// ID: 10 to 99
+	v.Add("uid", strconv.Itoa(10+rand.Intn(90)))
 
-	js, err := json.Marshal(v)
-	if err != nil {
-		return "", fmt.Errorf("parsing user %s: %s", user, err)
-	}
+	v.Add("role", "user")
 
-	return string(js), nil
+	return v.Encode(), nil
 }
 
 func createAdminProfile(
-	encryptionOracle, decryptionOracle aesOracle,
-) (string, error) {
+	encryptionOracle aesOracle,
+	adminOracle func([]byte) (bool, error),
+) (bool, error) {
 
-	// cipherText, err := encryptionOracle([]byte("foo@barrr.com"))
-	// if err != nil {
-	// 	return "", fmt.Errorf("encrypting user profile %q: %s", forgedUser, err)
-	// }
+	// This email generate a ciphertext with the following blocks:
+	// block 0: email=foo%40bar.
+	// block 1: aaaaaaacom&role=
+	// block 2: user&uid=42 + padding
+	const forgedUserEmail = "foo@bar.aaaaaaaaaa"
+	forgedUser, err := encryptionOracle([]byte(forgedUserEmail))
+	if err != nil {
+		return false, err
+	}
 
-	// adminCipherText, err := encryptionOracle([]byte("admin"))
-	// if err != nil {
-	// 	const formatStr = "encrypting 'admin' string %q: %s"
-	// 	return "", fmt.Errorf(formatStr, forgedUser, err)
-	// }
+	// This email generate a ciphertext with the following blocks:
+	// block 0: email=foo%40aaaa
+	// block 1: admin&role=user&
+	// block 2: uid=42 + padding
+	const maliciousAdminEmail = "foo@aaaaadmin"
+	maliciousProfile, err := encryptionOracle([]byte(maliciousAdminEmail))
+	if err != nil {
+		return false, err
+	}
 
-	// copy(cipherText[len(cipherText)-aes.BlockSize:], adminCipherText)
+	var (
+		// We can now compose a cipher text by copy pasting blocks of the two
+		// different cipher texts, so that they form an encrypted user profile
+		// that decrypts to an admin user.
+		b1 = forgedUser[:16]         // email=foo%40bar.
+		b2 = forgedUser[16:32]       // aaaaaaacom&role=
+		b3 = maliciousProfile[16:32] // admin&role=user&
+		b4 = maliciousProfile[32:]   // uid=XX+padding
+	)
 
-	// adminUser, err := decryptionOracle(cipherText)
-	// if err != nil {
-	// 	return "", fmt.Errorf("decrypting user profile: %s", err)
-	// }
-
-	// adminUserStr, err := parseUser(string(delPadPkcs7(adminUser)))
-	// if err != nil {
-	// 	return "", err
-	// }
-
-	return "", nil
+	// the concatenation of the blocks above gives us:
+	// email=foo%40bar.aaaaaaaaaa&role=admin&role=user&uid=XX
+	return adminOracle(slices.Concat(b1, b2, b3, b4))
 }

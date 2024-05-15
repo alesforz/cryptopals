@@ -2,8 +2,20 @@ package main
 
 import (
 	"crypto/aes"
+	"net/url"
 	"testing"
 )
+
+func TestProfileFor(t *testing.T) {
+	const email = "foo@bar.com"
+
+	if got, err := profileFor(email); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	} else {
+		// it encodes the '@' char as '%40'
+		t.Log(got)
+	}
+}
 
 func TestCreateAdminUser(t *testing.T) {
 	key, err := randomBytes(aes.BlockSize, aes.BlockSize)
@@ -19,14 +31,32 @@ func TestCreateAdminUser(t *testing.T) {
 		return encryptAesEcb([]byte(userProfile), key)
 	}
 
-	decryptionOracle := func(plainText []byte) ([]byte, error) {
-		return decryptAesEcb(plainText, key)
+	adminOracle := func(cipherText []byte) (bool, error) {
+		const (
+			roleKey   = "role"
+			adminRole = "admin"
+		)
+		plainText, err := decryptAesEcb(cipherText, key)
+		if err != nil {
+			return false, err
+		}
+
+		adminProfile := delPadPkcs7(plainText)
+		v, err := url.ParseQuery(string(adminProfile))
+		if err != nil {
+			return false, err
+		}
+
+		t.Log(string(adminProfile))
+
+		return v.Get(roleKey) == adminRole, nil
 	}
 
-	admin, err := createAdminProfile(encryptionOracle, decryptionOracle)
+	isAdmin, err := createAdminProfile(encryptionOracle, adminOracle)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %s", err)
 	}
-
-	t.Log(admin)
+	if !isAdmin {
+		t.Fatalf("Profile is not admin")
+	}
 }
