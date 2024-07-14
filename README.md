@@ -4,3 +4,5 @@ These challenges ask you to build and break crypto systems with attacks that app
 
 I'm currently (slowly) going through them.
 So far, solved up to and including the [ECB cut-and-paste](https://cryptopals.com/sets/2/challenges/13) challenge.
+
+Note: I focus on solving the challenges rather than on having production-ready code ;)
