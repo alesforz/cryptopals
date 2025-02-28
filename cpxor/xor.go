@@ -3,10 +3,13 @@ package cpxor
 import (
 	"encoding/hex"
 	"fmt"
+
+	"github.com/alesforz/cryptopals/cptext"
 )
 
 // hexStrs performs a bitwise XOR operation between two hexadecimal strings of equal
 // length and returns the result as a new hexadecimal string.
+// (Solves challenge 2 of set 1).
 func hexStrs(s1, s2 string) (string, error) {
 	// We decode the hex strings to bytes before checking their length, because
 	// the byte length might be different from the hex string length due to how
@@ -30,6 +33,34 @@ func hexStrs(s1, s2 string) (string, error) {
 	return hex.EncodeToString(xored), nil
 }
 
+// decryptSingleByteCipher attempts to decrypt a given ciphertext by XORing it
+// against each 255 1-byte keys. It then checks which resulting plaintext has
+// character frequencies closest to typical English text.
+// decryptSingleByteCipher returns the decrypted plaintext as a string and the key
+// used to decrypt it.
+// decryptSingleByteCipher does not modify the input slice.
+// (Solves challenges 3 and 4 of set 1).
+func decryptSingleByteCipher(cipherText []byte) (string, byte) {
+	const asciiBytes = 256
+	var (
+		bestScore float64
+		plainText []byte
+		key       byte
+	)
+	for char := range asciiBytes {
+		decrypted := withChar(cipherText, byte(char))
+		score := cptext.ComputeScore(decrypted)
+
+		if score > bestScore {
+			bestScore = score
+			plainText = decrypted
+			key = byte(char)
+		}
+	}
+
+	return string(plainText), key
+}
+
 // blocks takes two byte slices of equal length, b1 and b2, and returns a new
 // byte slice containing the result of a byte-wise XOR operation between
 // corresponding elements of b1 and b2.
@@ -47,4 +78,15 @@ func blocks(b1, b2 []byte) ([]byte, error) {
 	}
 
 	return xored, nil
+}
+
+// withChar XORs each byte of the input data slice with the provided character and
+// returns a new byte slice with the result.
+// withChar does not modify the input slice.
+func withChar(data []byte, char byte) []byte {
+	xored := make([]byte, len(data))
+	for i, b := range data {
+		xored[i] = b ^ char
+	}
+	return xored
 }

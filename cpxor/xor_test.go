@@ -1,12 +1,17 @@
 package cpxor
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/hex"
+	"os"
 	"testing"
+
+	"github.com/alesforz/cryptopals/cptext"
 )
 
 func TestHexStrs(t *testing.T) {
-	var (
+	const (
 		hexStr1    = "1c0111001f010100061a024b53535009181c"
 		hexStr2    = "686974207468652062756c6c277320657965"
 		wantHexStr = "746865206b696420646f6e277420706c6179"
@@ -19,6 +24,62 @@ func TestHexStrs(t *testing.T) {
 	if gotHexStr != wantHexStr {
 		t.Errorf("got: %s\nwant: %s\n", gotHexStr, wantHexStr)
 	}
+}
+
+func TestDecryptSingleByteCipher(t *testing.T) {
+	t.Run("Challenge3", func(t *testing.T) {
+		const hexStr = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
+
+		cipherText, err := hex.DecodeString(hexStr)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		gotPlainText, gotKey := decryptSingleByteCipher(cipherText)
+
+		t.Logf("Key: %c\n", gotKey)
+		t.Logf("Decoded string: %s\n", gotPlainText)
+	})
+
+	t.Run("Challenge4", func(t *testing.T) {
+		// One of the 60-character strings in this file has been encrypted by
+		// single-character XOR. Must find it and print it.
+		f, err := os.Open("../files/c4.txt")
+		if err != nil {
+			t.Fatalf("opening file: %s", err)
+		}
+		defer f.Close()
+
+		var (
+			s         = bufio.NewScanner(f)
+			bestScore float64
+			plainText string
+			key       byte
+		)
+		for s.Scan() {
+			cipherText, err := hex.DecodeString(s.Text())
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+
+			gotPlainText, gotKey := decryptSingleByteCipher(cipherText)
+
+			score := cptext.ComputeScore([]byte(gotPlainText))
+			if score > bestScore {
+				bestScore = score
+				plainText = gotPlainText
+				key = gotKey
+			}
+		}
+
+		if err := s.Err(); err != nil {
+			t.Fatalf("parsing file: %s", err)
+		}
+
+		t.Logf("Key: %c\n", key)
+		t.Logf("Decoded string: %s\n", plainText)
+	})
+
 }
 
 func TestBlocks(t *testing.T) {
