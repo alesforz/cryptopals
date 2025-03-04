@@ -94,8 +94,9 @@ func encryptWithChar(data []byte, char byte) []byte {
 // decryptWithChar XORs each byte of the input data slice with the provided
 // character and returns a new byte slice with the result.
 // decryptWithChar does not modify the input slice.
-// This function is an alias for encryptWithChar, as XORing twice with the same
-// character results in the original data.
+// This function is an alias for encryptWithChar (since XORing a byte twice with the
+// same key byte results in the original byte) added for better readability
+// in the context of wanting to decrypt a ciphertext.
 func decryptWithChar(data []byte, char byte) []byte {
 	return encryptWithChar(data, char)
 }
