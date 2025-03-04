@@ -26,7 +26,7 @@ func TestHexStrs(t *testing.T) {
 	}
 }
 
-func TestDecryptSingleByteCipher(t *testing.T) {
+func TestDecryptSingleByteXORCipher(t *testing.T) {
 	t.Run("Challenge3", func(t *testing.T) {
 		const hexStr = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
 
@@ -35,7 +35,7 @@ func TestDecryptSingleByteCipher(t *testing.T) {
 			t.Fatalf("unexpected error: %s", err)
 		}
 
-		gotPlainText, gotKey := decryptSingleByteCipher(cipherText)
+		gotPlainText, gotKey := decryptSingleByteXORCipher(cipherText)
 
 		t.Logf("Key: %c\n", gotKey)
 		t.Logf("Decoded string: %s\n", gotPlainText)
@@ -62,7 +62,7 @@ func TestDecryptSingleByteCipher(t *testing.T) {
 				t.Fatalf("unexpected error: %s", err)
 			}
 
-			gotPlainText, gotKey := decryptSingleByteCipher(cipherText)
+			gotPlainText, gotKey := decryptSingleByteXORCipher(cipherText)
 
 			score := cptext.ComputeScore([]byte(gotPlainText))
 			if score > bestScore {
@@ -82,7 +82,7 @@ func TestDecryptSingleByteCipher(t *testing.T) {
 
 }
 
-func TestEncryptRepeatingKey(t *testing.T) {
+func TestEncryptWithRepeatingKey(t *testing.T) {
 	const (
 		plainText = `Burning 'em, if you ain't quick and nimble
 I go crazy when I hear a cymbal`
@@ -96,7 +96,7 @@ I go crazy when I hear a cymbal`
 		keyBytes       = []byte(key)
 	)
 
-	gotCipherText := encryptRepeatingKey(plainTextBytes, keyBytes)
+	gotCipherText := encryptWithRepeatingKey(plainTextBytes, keyBytes)
 	if hex.EncodeToString(gotCipherText) != wantCipherText {
 		t.Errorf("want: %s\ngot: %s\n", wantCipherText, gotCipherText)
 	}

@@ -33,14 +33,14 @@ func hexStrs(s1, s2 string) (string, error) {
 	return hex.EncodeToString(xored), nil
 }
 
-// decryptSingleByteCipher attempts to decrypt a given ciphertext by XORing it
+// decryptSingleByteXORCipher attempts to decrypt a given ciphertext by XORing it
 // against each 255 1-byte keys. It then checks which resulting plaintext has
 // character frequencies closest to typical English text.
-// decryptSingleByteCipher returns the decrypted plaintext as a string and the key
+// decryptSingleByteXORCipher returns the decrypted plaintext as a string and the key
 // used to decrypt it.
-// decryptSingleByteCipher does not modify the input slice.
+// decryptSingleByteXORCipher does not modify the input slice.
 // (Solves challenges 3 and 4 of set 1).
-func decryptSingleByteCipher(cipherText []byte) (string, byte) {
+func decryptSingleByteXORCipher(cipherText []byte) (string, byte) {
 	const asciiBytes = 256
 	var (
 		bestScore float64
@@ -48,7 +48,7 @@ func decryptSingleByteCipher(cipherText []byte) (string, byte) {
 		key       byte
 	)
 	for char := range asciiBytes {
-		decrypted := withChar(cipherText, byte(char))
+		decrypted := decryptWithChar(cipherText, byte(char))
 		score := cptext.ComputeScore(decrypted)
 
 		if score > bestScore {
@@ -61,15 +61,16 @@ func decryptSingleByteCipher(cipherText []byte) (string, byte) {
 	return string(plainText), key
 }
 
-// encryptRepeatingKey encrypts the given text using a repeating-key XOR operation.
+// encryptWithRepeatingKey encrypts the given text using a repeating-key XOR
+// operation.
 // Each byte of the text is XORed with a corresponding byte from the key. If the
 // length of the text exceeds the length of the key, the key is repeated cyclically.
 // For example, if the text is "HELLO" and the key is "AB", the effective key
 // used for encryption would be "ABABA".
 // It returns the encrypted text as a new byte slice.
-// encryptRepeatingKey does not modify the input slices.
+// encryptWithRepeatingKey does not modify the input slices.
 // (Solves challenge 5 of set 1).
-func encryptRepeatingKey(plainText, key []byte) []byte {
+func encryptWithRepeatingKey(plainText, key []byte) []byte {
 	var (
 		cipherText = make([]byte, len(plainText))
 		keyLen     = len(key)
@@ -100,13 +101,22 @@ func blocks(b1, b2 []byte) ([]byte, error) {
 	return xored, nil
 }
 
-// withChar XORs each byte of the input data slice with the provided character and
-// returns a new byte slice with the result.
-// withChar does not modify the input slice.
-func withChar(data []byte, char byte) []byte {
+// encryptWithChar XORs each byte of the input data slice with the provided
+// character and returns a new byte slice with the result.
+// encryptWithChar does not modify the input slice.
+func encryptWithChar(data []byte, char byte) []byte {
 	xored := make([]byte, len(data))
 	for i, b := range data {
 		xored[i] = b ^ char
 	}
 	return xored
+}
+
+// decryptWithChar XORs each byte of the input data slice with the provided
+// character and returns a new byte slice with the result.
+// decryptWithChar does not modify the input slice.
+// This function is an alias for encryptWithChar, as XORing twice with the same
+// character results in the original data.
+func decryptWithChar(data []byte, char byte) []byte {
+	return encryptWithChar(data, char)
 }
