@@ -9,6 +9,8 @@ import (
 // The function does not modify the input slice.
 type AESOracle func([]byte) []byte
 
+type Block [aes.BlockSize]byte
+
 // decryptionOracle initializes an AES decryption operation using the provided key.
 // It returns an AESOracle which performs the decryption of a byte slice with the
 // given key using AES.
