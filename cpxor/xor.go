@@ -7,6 +7,25 @@ import (
 	"github.com/alesforz/cryptopals/cptext"
 )
 
+// Blocks takes two byte slices of equal length, b1 and b2, and returns a new
+// byte slice containing the result of a byte-wise XOR operation between
+// corresponding elements of b1 and b2.
+// Blocks does not modify the input slices.
+func Blocks(b1, b2 []byte) ([]byte, error) {
+	lb1, lb2 := len(b1), len(b2)
+	if lb1 != lb2 {
+		errStr := "input blocks are of different lengths: %d and %d"
+		return nil, fmt.Errorf(errStr, lb1, lb2)
+	}
+
+	xored := make([]byte, lb1)
+	for i := range xored {
+		xored[i] = b1[i] ^ b2[i]
+	}
+
+	return xored, nil
+}
+
 // hexStrs performs a bitwise XOR operation between two hexadecimal strings of equal
 // length and returns the result as a new hexadecimal string.
 // (Solves challenge 2 of set 1).
@@ -25,7 +44,7 @@ func hexStrs(s1, s2 string) (string, error) {
 		return "", fmt.Errorf("malformed input hex string: %x", s2)
 	}
 
-	xored, err := blocks(b1, b2)
+	xored, err := Blocks(b1, b2)
 	if err != nil {
 		return "", fmt.Errorf("can't xor given strings: %s", err)
 	}
@@ -59,25 +78,6 @@ func decryptSingleByteXORCipher(cipherText []byte) ([]byte, byte) {
 	}
 
 	return plainText, key
-}
-
-// blocks takes two byte slices of equal length, b1 and b2, and returns a new
-// byte slice containing the result of a byte-wise XOR operation between
-// corresponding elements of b1 and b2.
-// blocks does not modify the input slices.
-func blocks(b1, b2 []byte) ([]byte, error) {
-	lb1, lb2 := len(b1), len(b2)
-	if lb1 != lb2 {
-		errStr := "input blocks are of different lengths: %d and %d"
-		return nil, fmt.Errorf(errStr, lb1, lb2)
-	}
-
-	xored := make([]byte, lb1)
-	for i := range xored {
-		xored[i] = b1[i] ^ b2[i]
-	}
-
-	return xored, nil
 }
 
 // encryptWithChar XORs each byte of the input data slice with the provided

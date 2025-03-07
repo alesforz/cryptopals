@@ -88,7 +88,7 @@ func TestBlocks(t *testing.T) {
 			b1 = []byte{0x01, 0x02, 0x03}
 			b2 = []byte{0x01, 0x02, 0x03}
 		)
-		got, err := blocks(b1, b2)
+		got, err := Blocks(b1, b2)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -104,7 +104,7 @@ func TestBlocks(t *testing.T) {
 			b1 = []byte{0x01, 0x02, 0x03}
 			b2 = []byte{0x01, 0x02}
 		)
-		_, err := blocks(b1, b2)
+		_, err := Blocks(b1, b2)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
