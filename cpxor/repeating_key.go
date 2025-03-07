@@ -51,18 +51,18 @@ func decryptWithRepeatingKey(cipherText, key []byte) []byte {
 // 3. Recovers the decryption key with frequency analysis on each transposed
 // block to determine the key's byte used to encrypt that particular block.
 // 4. Decrypts the cipher text
-// Returns the decrypted text as a string, the key used to encrypt/decrypt it as
-// string, and an error (if any).
+// Returns the decrypted text, the key used to encrypt/decrypt it , and an error (if
+// any).
 // breakRepeatingKeyXORCipher does not modify the input slice.
 // (Solves challenge 6 of set 1).
 func breakRepeatingKeyXORCipher(
 	cipherText []byte,
 	maxKeySize int,
-) (string, string, error) {
+) ([]byte, []byte, error) {
 
 	keySize, err := estimateXORKeySize(cipherText, maxKeySize)
 	if err != nil {
-		return "", "", fmt.Errorf("breaking repeating key XOR: %s", err)
+		return nil, nil, fmt.Errorf("breaking repeating key XOR: %s", err)
 	}
 
 	var (
@@ -165,7 +165,7 @@ func breakRepeatingKeyXORCipher(
 
 	plainText := decryptWithRepeatingKey(cipherText, decryptionKey)
 
-	return string(plainText), string(decryptionKey), nil
+	return plainText, decryptionKey, nil
 }
 
 // estimateXORKeySize tries to deduce the most probable key size for a given

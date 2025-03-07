@@ -53,7 +53,7 @@ func TestDecryptSingleByteXORCipher(t *testing.T) {
 		var (
 			s         = bufio.NewScanner(f)
 			bestScore float64
-			plainText string
+			plainText []byte
 			key       byte
 		)
 		for s.Scan() {

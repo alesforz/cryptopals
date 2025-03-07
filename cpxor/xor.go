@@ -36,11 +36,11 @@ func hexStrs(s1, s2 string) (string, error) {
 // decryptSingleByteXORCipher attempts to decrypt a given ciphertext by XORing it
 // against each 255 1-byte keys. It then checks which resulting plaintext has
 // character frequencies closest to typical English text.
-// decryptSingleByteXORCipher returns the decrypted plaintext as a string and the key
-// used to decrypt it.
+// decryptSingleByteXORCipher returns the decrypted plaintext and the key used to
+// decrypt it.
 // decryptSingleByteXORCipher does not modify the input slice.
 // (Solves challenges 3 and 4 of set 1).
-func decryptSingleByteXORCipher(cipherText []byte) (string, byte) {
+func decryptSingleByteXORCipher(cipherText []byte) ([]byte, byte) {
 	const asciiBytes = 256
 	var (
 		bestScore float64
@@ -58,7 +58,7 @@ func decryptSingleByteXORCipher(cipherText []byte) (string, byte) {
 		}
 	}
 
-	return string(plainText), key
+	return plainText, key
 }
 
 // blocks takes two byte slices of equal length, b1 and b2, and returns a new
