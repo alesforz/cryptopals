@@ -2,12 +2,42 @@ package cpaes
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/alesforz/cryptopals/cppad"
 )
+
+func TestEncryptECB(t *testing.T) {
+	const (
+		plainTextStr = "Lorem ipsum dolor sit amet consectetur adipiscin"
+		keyStr       = "YELLOW SUBMARINE"
+	)
+
+	var (
+		plainText = []byte(plainTextStr)
+		key       = []byte(keyStr)
+	)
+
+	cipherText, err := encryptECB(plainText, key)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	decrypted, err := decryptECB(cipherText, key)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	unpadded := cppad.RemovePKCS7(decrypted)
+	if !bytes.Equal(unpadded, plainText) {
+		t.Errorf("want: %q\ngot: %q", plainText, decrypted)
+	}
+}
 
 func TestDecryptECB(t *testing.T) {
 	f, err := os.Open("../files/c7.txt")

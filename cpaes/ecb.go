@@ -3,10 +3,41 @@ package cpaes
 import (
 	"crypto/aes"
 	"fmt"
+
+	"github.com/alesforz/cryptopals/cppad"
 )
+
+// encryptECB encrypts a plain text using AES-128 in ECB mode with the given key.
+// The function does not modify the input slices.
+func encryptECB(plainText, key []byte) ([]byte, error) {
+	plainText = cppad.PKCS7(plainText, aes.BlockSize)
+
+	encrypter, err := encryptionOracle(key)
+	if err != nil {
+		return nil, fmt.Errorf("initializing encryption oracle: %s", err)
+	}
+
+	var (
+		pLen       = len(plainText)
+		blkSize    = aes.BlockSize
+		nBlocks    = (pLen + blkSize - 1) / blkSize
+		cipherText = make([]byte, 0, pLen)
+	)
+	for i := range nBlocks {
+		var (
+			start        = i * blkSize
+			end          = start + blkSize
+			encryptedBlk = encrypter(plainText[start:end])
+		)
+		cipherText = append(cipherText, encryptedBlk...)
+	}
+
+	return cipherText, nil
+}
 
 // decryptECB decrypts a cipher text encrypted using AES-128 in ECB mode with the
 // given key.
+// The function does not modify the input slices.
 // (Solves challenge 7 of set 1)
 func decryptECB(cipherText, key []byte) ([]byte, error) {
 	cLen, kLen := len(cipherText), len(key)
