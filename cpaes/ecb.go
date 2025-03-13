@@ -3,7 +3,9 @@ package cpaes
 import (
 	"crypto/aes"
 	"fmt"
+	"math/rand/v2"
 
+	"github.com/alesforz/cryptopals/cpbytes"
 	"github.com/alesforz/cryptopals/cppad"
 )
 
@@ -101,4 +103,32 @@ func detectECB(cipherText []byte) bool {
 		blkSet[currBlk] = struct{}{}
 	}
 	return false
+}
+
+// randomEncryption chooses to encrypt using AES ECB 1/2 the time, and using AES CBC
+// the other half (using a random IV).
+// The function does not modify the input slice.
+// (Solves challenge 11 of set 2)
+func randomEncryption(plainText []byte) ([]byte, error) {
+	padded, err := cpbytes.AddNoise(plainText, 5, 10)
+	if err != nil {
+		return nil, fmt.Errorf("adding noise to plain text: %s", err)
+	}
+
+	key, err := cpbytes.Random(aes.BlockSize, aes.BlockSize)
+	if err != nil {
+		return nil, fmt.Errorf("generating random AES key: %s", err)
+	}
+
+	if coinFlip := rand.IntN(2); coinFlip == 0 {
+		return encryptECB(padded, key)
+	}
+
+	iv, err := cpbytes.Random(aes.BlockSize, aes.BlockSize)
+	if err != nil {
+		const formatStr = "generating random IV for AES CBC encryption: %s"
+		return nil, fmt.Errorf(formatStr, err)
+	}
+
+	return encryptCBC(padded, key, iv)
 }

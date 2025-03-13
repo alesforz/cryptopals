@@ -90,3 +90,27 @@ func TestDetectECB(t *testing.T) {
 		t.Errorf("reading input file: %s", err)
 	}
 }
+
+func TestRandomEncryption(t *testing.T) {
+	// we can choose the plaintext. Therefore, to distinguish between the 2
+	// encryption modes, we use a plaintext that repeats itself. Remember that ECB
+	// produces the same ciphertext blocks given the same plaintext blocks.
+	var (
+		text               = []byte("Let's encrypt this stuff")
+		plainText          = bytes.Repeat(text, 5)
+		countECB, countCBC int
+	)
+	for range 1000 {
+		cipherText, err := randomEncryption(plainText)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if detectECB(cipherText) {
+			countECB++
+		} else {
+			countCBC++
+		}
+	}
+
+	t.Logf("Oracle used ECB %d and CBC %d times\n", countECB, countCBC)
+}
