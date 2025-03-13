@@ -1,11 +1,39 @@
 package cpaes
 
 import (
+	"bytes"
 	"encoding/base64"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/alesforz/cryptopals/cppad"
 )
+
+func TestEncryptCBC(t *testing.T) {
+	var (
+		plainText = []byte("Lorem ipsum dolor sit amet consectetur adipiscin")
+		key       = []byte("YELLOW SUBMARINE")
+		iv        = make([]byte, len(key))
+	)
+	for i := range iv {
+		iv[i] = byte(0)
+	}
+
+	cipherText, err := encryptCBC(plainText, key, iv)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	decrypted, err := decryptCBC(cipherText, key, iv)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if !bytes.Equal(cppad.RemovePKCS7(decrypted), plainText) {
+		t.Errorf("want: %q\ngot: %q\n", plainText, decrypted)
+	}
+}
 
 func TestDecryptCBC(t *testing.T) {
 	f, err := os.Open("../files/c10.txt")
