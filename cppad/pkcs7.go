@@ -27,3 +27,30 @@ func PKCS7(data []byte, size int) []byte {
 
 	return padded
 }
+
+// RemovePKCS7 deletes PKCS7 padding from data.
+// This is a necessary step after decryption of an AES cipher text because AES
+// always adds padding before encrypting a plain text.
+// If the plaintext is exactly a multiple of the block size, without adding an
+// extra block of padding, the decryption process would not be able to
+// distinguish whether the last block is part of the plaintext or padding.
+// By always adding an additional block of padding, the decrypted message
+// clearly indicates the presence of padding bytes, which can be correctly
+// removed.
+// RemovePKCS7 does not modify the input slice; rather, it returns a new slice
+// with the padding removed.
+func RemovePKCS7(data []byte) []byte {
+	if len(data) == 0 {
+		return data
+	}
+
+	var (
+		pad      = int(data[len(data)-1])
+		unpadded = make([]byte, len(data)-pad)
+	)
+	// copy copies the minimum of len(unpadded) and len(data) bytes from data to
+	// unpadded, therefore it copies only the unpadded bytes.
+	copy(unpadded, data)
+
+	return unpadded
+}
