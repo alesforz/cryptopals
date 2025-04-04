@@ -5,17 +5,16 @@ import (
 	"fmt"
 )
 
-// AESOracle is a type that encrypts/decrypts a given plain/cipher text using AES.
+// Oracle is a type that encrypts/decrypts a given plain/cipher text using AES.
 // The function does not modify the input slice.
-type AESOracle func([]byte) []byte
+type Oracle func([]byte) []byte
 
 type Block [aes.BlockSize]byte
 
-// encryptionOracle initializes an AES encryption operation using the provided key.
-// It returns an AESOracle which performs the encryption of a byte slice with the
-// given key using AES.
+// encryptionOracle returns an AESOracle which performs the encryption of a byte
+// slice with the given key.
 // encryptionOracle does not modify the input slice.
-func encryptionOracle(key []byte) (AESOracle, error) {
+func encryptionOracle(key []byte) (Oracle, error) {
 	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("instantiating AES cipher: %w", err)
@@ -30,11 +29,10 @@ func encryptionOracle(key []byte) (AESOracle, error) {
 	return encrypter, nil
 }
 
-// decryptionOracle initializes an AES decryption operation using the provided key.
-// It returns an AESOracle which performs the decryption of a byte slice with the
-// given key using AES.
+// decryptionOracle returns an AESOracle which performs the decryption of a byte
+// slice with the given key.
 // decryptionOracle does not modify the input slice.
-func decryptionOracle(key []byte) (AESOracle, error) {
+func decryptionOracle(key []byte) (Oracle, error) {
 	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("instantiating AES cipher: %w", err)

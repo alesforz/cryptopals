@@ -10,6 +10,8 @@ import (
 )
 
 // encryptECB encrypts a plain text using AES-128 in ECB mode with the given key.
+// It pads the plain text using PKCS#7 padding to ensure its length is a multiple
+// of the block size.
 // The function does not modify the input slices.
 func encryptECB(plainText, key []byte) ([]byte, error) {
 	plainText = cppad.PKCS7(plainText, aes.BlockSize)
@@ -131,4 +133,27 @@ func randomEncryption(plainText []byte) ([]byte, error) {
 	}
 
 	return encryptCBC(padded, key, iv)
+}
+
+func ecbEncryptionOracle(secret []byte) Oracle {
+	key, err := cpbytes.Random(aes.BlockSize, aes.BlockSize)
+	if err != nil {
+		panicMsg := "generating random AES key: " + err.Error()
+		panic(panicMsg)
+	}
+
+	oracle := func(plainText []byte) []byte {
+		plainTextWithSecret := make([]byte, len(plainText)+len(secret))
+		copy(plainTextWithSecret, plainText)
+		copy(plainTextWithSecret[len(plainText):], secret)
+
+		cipherText, err := encryptECB(plainTextWithSecret, key)
+		if err != nil {
+			panic(err)
+		}
+
+		return cipherText
+	}
+
+	return oracle
 }
