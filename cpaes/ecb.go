@@ -1,7 +1,9 @@
 package cpaes
 
 import (
+	"bytes"
 	"crypto/aes"
+	"encoding/base64"
 	"fmt"
 	"math/rand/v2"
 
@@ -135,11 +137,27 @@ func randomEncryption(plainText []byte) ([]byte, error) {
 	return encryptCBC(padded, key, iv)
 }
 
-func ecbEncryptionOracle(secret []byte) Oracle {
+func decryptECBOracleSecret(ECBOracle Oracle) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ecbEncryptionOracleWithSecret returns an AES oracle that appends a secret string
+// to the given plain text before encrypting it using AES ECB.
+// ecbEncryptionOracleWithSecret generates a random encryption key that the oracle
+// will use to encrypt.
+// Part of challenge 12 of set 2.
+func ecbEncryptionOracleWithSecret() (Oracle, error) {
+	// the secret is given by the challenge description
+	const secretBase64 = `Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK`
+
+	secret, err := base64.StdEncoding.DecodeString(secretBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decoding secret from base64: %s", err)
+	}
+
 	key, err := cpbytes.Random(aes.BlockSize, aes.BlockSize)
 	if err != nil {
-		panicMsg := "generating random AES key: " + err.Error()
-		panic(panicMsg)
+		return nil, fmt.Errorf("generating random AES key: %s", err)
 	}
 
 	oracle := func(plainText []byte) []byte {
@@ -155,5 +173,38 @@ func ecbEncryptionOracle(secret []byte) Oracle {
 		return cipherText
 	}
 
-	return oracle
+	return oracle, nil
+}
+
+// findECBBlockSizeAndSuffixLength probes the given ECB encryption oracle to discover
+// two key parameters: the cipher’s block size in bytes, and the number of unknown
+// bytes the oracle appends before encryption.
+// It returns the block size and the suffix length.
+func findECBBlockSizeAndSuffixLength(oracle Oracle) (int, int) {
+	var (
+		blockSize int
+
+		// suffixLength is the number of bytes of unknown data the oracle appends
+		// after the plain text, before applying padding and encryption.
+		suffixLength int
+		cipherLen    = len(oracle([]byte{'a'}))
+	)
+	for i := 2; ; i++ {
+		nextCipherLen := len(oracle(bytes.Repeat([]byte{'a'}, i)))
+		if nextCipherLen > cipherLen {
+			// We feed an increasing amount of 'a' to the encryption oracle until
+			// the length of the resulting cipher text increases.
+
+			// The increase (nextCipherLen – cipherLen) equals the block size,
+			// because the cipher text must have increased by exactly 1 block.
+			blockSize = nextCipherLen - cipherLen
+
+			// It took i amount of 'a's to increase the cipher text length.
+			// Therefore unknown suffix must be (cipherLen – i) bytes long.
+			suffixLength = cipherLen - i
+			break
+		}
+	}
+
+	return blockSize, suffixLength
 }

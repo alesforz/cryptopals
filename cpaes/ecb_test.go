@@ -114,3 +114,18 @@ func TestRandomEncryption(t *testing.T) {
 
 	t.Logf("Oracle used ECB %d and CBC %d times\n", countECB, countCBC)
 }
+
+func TestDecryptOracleSecret(t *testing.T) {
+	// const s = "YELLOW SUBMARINE+RED SUNSHINES=IMMENSE HAPPINESS"
+	_, err := ecbEncryptionOracleWithSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// decryptedSecret, err := decryptOracleSecret(o)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	// t.Log(string(delPadPkcs7(decryptedSecret)))
+}
