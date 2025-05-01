@@ -19,19 +19,18 @@ import (
 // at a time, thus reconstructing it without needing the encryption key.
 // This method exploits the deterministic nature of block ciphers and the feedback
 // from the oracle to reveal the hidden data.
-// See file example_byte_at_a_time_atk.txt for a visual example of this method.
 // Challenge 12 of set 2.
 func byteAtTimeAtk(ECBOracle Oracle) ([]byte, error) {
 	blkSize, secretLen := findECBBlockSizeAndSuffixLength(ECBOracle)
-	fmt.Println("block size:", blkSize)
-	fmt.Println("suffix length:", secretLen)
+	// fmt.Println("block size:", blkSize)
+	// fmt.Println("suffix length:", secretLen)
 
 	if blkSize != aes.BlockSize {
 		const formatStr = "block size %d is not equal to AES block size %d"
 		return nil, fmt.Errorf(formatStr, blkSize, aes.BlockSize)
 	}
 
-	testBuf := bytes.Repeat([]byte{0x00}, blkSize*2)
+	testBuf := make([]byte, blkSize*2)
 	if !detectECB(ECBOracle(testBuf)) {
 		return nil, fmt.Errorf("oracle doesn't encrypt with AES ECB")
 	}
@@ -45,10 +44,50 @@ func byteAtTimeAtk(ECBOracle Oracle) ([]byte, error) {
 		// will be the first byte of the secret. With length 14, the encrypted
 		// output will have the first 15 bytes as 'A' and the 15th and 16th will be
 		// the first 2 bytes of the secret.
+		// blkDict = [
+		//    []
+		//    [0]
+		//    [00]
+		//    [000]
+		//    [0000]
+		//    [00000]
+		//    [000000]
+		//    [0000000]
+		//    [00000000]
+		//    [000000000]
+		//    [0000000000]
+		//    [00000000000]
+		//    [000000000000]
+		//    [0000000000000]
+		//    [00000000000000]
+		//    [000000000000000]
+		// ]
 		blkDict = makeBlockDict(blkSize)
 
 		// Store the cipher text for each block in the dictionary to avoid calling
 		// the oracle multiple times for the same block during the attack.
+		// Assume YELLOWSUN is the secret.
+		// cipherTextCache = [
+		//    pad=0,   [YELLOWSUN*******]
+		//    pad=1,   [0YELLOWSUN******]
+		//    pad=2,   [00YELLOWSUN*****]
+		//    pad=3,   [000YELLOWSUN****]
+		//    pad=4,   [0000YELLOWSUN***]
+		//    pad=5,   [00000YELLOWSUN**]
+		//    pad=6,   [000000YELLOWSUN*]
+		//    pad=7,   [0000000YELLOWSUN]
+		//    pad=8,   [00000000YELLOWSU | N***************]
+		//    pad=9,   [000000000YELLOWS | UN**************]
+		//    pad=10,  [0000000000YELLOW | SUN*************]
+		//    pad=11,  [00000000000YELLO | WSUN************]
+		//    pad=12,  [000000000000YELL | OWSUN***********]
+		//    pad=13,  [0000000000000YEL | LOWSUN**********]
+		//    pad=14,  [00000000000000YE | LLOWSUN*********]
+		//    pad=15,  [000000000000000Y | ELLOWSUN********]
+		// ]
+		// Recall that the oracle will append the secret immediately after the data
+		// we provide.
+		//  * means any other character after the secret that we don't care about
 		cipherTextCache = makeBlockCipherTextCache(blkDict, ECBOracle)
 
 		nSecretBlks = (secretLen + blkSize - 1) / blkSize
@@ -74,13 +113,57 @@ func byteAtTimeAtk(ECBOracle Oracle) ([]byte, error) {
 				// the cipher text block being targeted for decryption.
 				targetBlk = cipherTextCache[size][blkStart:blkEnd]
 			)
+
+			// What the above means, graphically:
+			// sz=15, forgedBlk=000000000000000, targetBlk=000000000000000Y, guess=Y
+			// sz=14, forgedBlk=00000000000000Y, targetBlk=00000000000000YE, guess=E
+			// sz=13, forgedBlk=0000000000000YE, targetBlk=0000000000000YEL, guess=L
+			// sz=12, forgedBlk=000000000000YEL, targetBlk=000000000000YELL, guess=L
+			// sz=11, forgedBlk=00000000000YELL, targetBlk=00000000000YELLO, guess=O
+			// sz=10, forgedBlk=0000000000YELLO, targetBlk=0000000000YELLOW, guess=W
+			// sz=9,  forgedBlk=000000000YELLOW, targetBlk=000000000YELLOWS, guess=S
+			// sz=8,  forgedBlk=00000000YELLOWS, targetBlk=00000000YELLOWSU, guess=U
+			// sz=7,  forgedBlk=0000000YELLOWSU, targetBlk=0000000YELLOWSUN, guess=N
+			// reconstructed secret = YELLOWSUN
 			guessedByte := guessByte(forgedBlk, targetBlk, blkIdx, ECBOracle)
 			secret = append(secret, guessedByte)
 
 			// uncomment to see decryption byte by byte
-			// fmt.Printf("%s\n", secret)
+			// fmt.Printf("%q\n", secret)
 			// time.Sleep(100 * time.Millisecond)
 
+			// We must stop right after recovering the real SECRET, because beyond
+			// that we’re trying to match the oracle’s PKCS#7 padding bytes, and
+			// those change size‐by‐size, so no forged block will ever line up.
+			//
+			// Here is what the additional iterations of the loop would look like:
+			// sz=6,  forgedBlk=000000YELLOWSUN, targetBlk=000000YELLOWSUN1, guess=1
+			// sz=5,  forgedBlk=00000YELLOWSUN1, targetBlk=00000YELLOWSUN22, guess=??
+			// (here the program would panic at the end of guessByte())
+			// sz=4,  forgedBlk=0000YELLOWSUN**, targetBlk=0000YELLOWSUN333, guess=??
+			// sz=3,  forgedBlk=000YELLOWSUN***, targetBlk=000YELLOWSUN4444, guess=??
+			// sz=2,  forgedBlk=00YELLOWSUN****, targetBlk=00YELLOWSUN55555, guess=??
+			// sz=1,  forgedBlk=0YELLOWSUN*****, targetBlk=0YELLOWSUN666666, guess=??
+			// sz=0,  forgedBlk=YELLOWSUN******, targetBlk=YELLOWSUN7777777, guess=??
+			// We changed the '*' for the bytes that the oracle would put there as
+			// padding. As you can see, each subsequent block of the cipher text
+			// would have a different padding byte. But we construct forgedBlk as:
+			// [0x00 *size | known_bytes | guess]
+			// For iteration sz=6, we build:
+			// forgedBlk=[0x00*6 | YELLOWSUN | _]
+			// where '_' is the byte we are guessing. Eventually, guessByte() will
+			// append 1 to the forgedBlk, and we will get:
+			// forgedBlk=[0x00*6 | YELLOWSUN | 1]
+			// which will correctly match the cipher text block of sz=6.
+			//
+			// But at sz=5, we build:
+			// forgedBlk=[0x00*5 | YELLOWSUN1 | _]
+			// which will never match the cipher text block of sz=5, which is:
+			// [0x00*5 | YELLOWSUN | 22]
+			// because the padding has changed!
+			// No matter how we guess the last byte, it will never match it, because
+			// the known parts are different (we have a 1 in the forged block, but a
+			// 2 in the cipher text block).
 			if len(secret) == secretLen {
 				// we have decrypted the entire secret
 				return secret, nil
@@ -141,18 +224,33 @@ func findECBBlockSizeAndSuffixLength(oracle Oracle) (int, int) {
 		cipherLen    = len(oracle([]byte{}))
 	)
 	for i := 1; ; i++ {
-		nextCipherLen := len(oracle(bytes.Repeat([]byte{'a'}, i)))
+		nextCipherLen := len(oracle(make([]byte, i)))
 		if nextCipherLen > cipherLen {
-			// We feed an increasing amount of 'a' to the encryption oracle until
-			// the length of the resulting cipher text increases.
+			// We feed an increasing amount of 0x00 bytes to the encryption oracle
+			// until the length of the resulting cipher text increases.
 
 			// The increase (nextCipherLen – cipherLen) equals the block size,
 			// because the cipher text must have increased by exactly 1 block.
 			blkSize = nextCipherLen - cipherLen
 
-			// It took i amount of 'a's to increase the cipher text length.
+			// It took i amount of 0x00 to increase the cipher text length.
 			// Therefore unknown suffix must be (cipherLen – i) bytes long.
 			suffixLength = cipherLen - i
+
+			// the above, graphically:
+			// before loop: cipher text=YELLOWSUN*******, cipherLen=16
+			// i=1, cipher text=0YELLOWSUN******, nextCipherLen=16
+			// i=2, cipher text=00YELLOWSUN*****, nextCipherLen=16
+			// i=3, cipher text=000YELLOWSUN****, nextCipherLen=16
+			// i=4, cipher text=0000YELLOWSUN***, nextCipherLen=16
+			// i=5, cipher text=00000YELLOWSUN**, nextCipherLen=16
+			// i=6, cipher text=000000YELLOWSUN*, nextCipherLen=16
+			// i=7, cipher text=0000000YELLOWSUN | ****************, nextCipherLen=16
+			// To understand the last iteration, recall that the ECB encryption adds
+			// a block of padding if the input is a multiple of the block size.
+			// -> nextCipherLen > cipherLen is true
+			// -> blkSize = nextCipherLen - cipherLen = 32 - 16 = 16
+			// -> suffixLength = cipherLen - i = 16 - 7 = 9
 			break
 		}
 	}
@@ -161,19 +259,14 @@ func findECBBlockSizeAndSuffixLength(oracle Oracle) (int, int) {
 }
 
 // makeBlockDict generates a lookup table of plaintext blocks of lengths 0 up to
-// blockSize−1, each filled entirely with the ASCII character 'A'.
+// blockSize−1, each filled with the 0x00 byte.
 // This is a useful tool for the byte-at-a-time decryption attack.
 // Part of challenge 12 of set 2.
 func makeBlockDict(blkSize int) [][]byte {
 	blkDict := make([][]byte, blkSize)
 
 	for size := range blkSize {
-		blk := make([]byte, size)
-		for i := range size {
-			blk[i] = 'A'
-		}
-
-		blkDict[size] = blk
+		blkDict[size] = make([]byte, size)
 	}
 
 	return blkDict
@@ -214,34 +307,8 @@ func guessByte(forgedBlk, targetBlk []byte, blkIdx int, ECBOracle Oracle) byte {
 		blkStart = blkIdx * blkSize
 		blkEnd   = blkStart + blkSize
 	)
-	// the "byte-at-a-time" part of the attack.
-	// This loop is responsible for guessing the value of the unknown byte of the
-	// secret by iterating through all possible byte values (0 to 255) and checking
-	// which one produces a ciphertext block that matches the target block.
-	// Basically, what we are doing is asking the oracle to encrypt all the possible
-	// byte sequences obtained by changing their last byte.
-	// For example:
-	// oracle("AAAAAAAAAAAAAAAA")
-	// oracle("AAAAAAAAAAAAAAAB")
-	// oracle("AAAAAAAAAAAAAAAC")
-	// oracle("AAAAAAAAAAAAAAAD")
-	// .....
-	// until the resulting cipher text matches the target block.
-	// If the cipher text generated by oracle("AAAAAAAAAAAAAAAD") matches, then 'D'
-	// is a byte of the secret.
-	// On the next round we will try all possible byte sequences like this:
-	// oracle("AAAAAAAAAAAAAADA")
-	// oracle("AAAAAAAAAAAAAADB")
-	// oracle("AAAAAAAAAAAAAADC")
-	// oracle("AAAAAAAAAAAAAADD")
-	// .....
-	// until the resulting cipher text matches the target block.
-	// If the cipher text generated by oracle("AAAAAAAAAAAAAADA") matches, then 'A'
-	// is the next byte of the secret.
-	// And so on until we decrypted the entire secret.
 	for i := range 255 {
 		guessByte := byte(i)
-
 		// append the byte we are using as a guess to the end of the forged block.
 		// Recall that forgedBlk has an extra byte at the end to accommodate the
 		// guess byte.
@@ -256,5 +323,5 @@ func guessByte(forgedBlk, targetBlk []byte, blkIdx int, ECBOracle Oracle) byte {
 	}
 
 	// we should never reach this point
-	panic("something went wrong: couldn't guess correct byte of cipher text")
+	panic("couldn't guess correct byte of cipher text")
 }
