@@ -1,45 +1,35 @@
-package main
+package cptext
 
 import "unicode/utf8"
 
-// singleByteXOR attempts to decrypt a given ciphertext by XORing it against
-// each 255 1-byte keys. It then checks which resulting plaintext has character
-// frequencies closest to typical English text.
-func singleByteXOR(cipherText []byte) (string, byte) {
-	var (
-		bestScore float64
-		plainText []byte
-		key       byte
-	)
+// _spaceFrequency is the frequency of the space character in English text.
+// Taken from
+// https://www3.nd.edu/~busiforc/handouts/cryptography/letterfrequencies.html
+const _spaceFrequency = 0.1918182
 
-	const asciiBytes = 256
-	for char := range asciiBytes {
-		decrypted := xorWithChar(cipherText, byte(char))
-		score := computeTextScore(decrypted)
-
-		if score > bestScore {
-			bestScore = score
-			plainText = decrypted
-			key = byte(char)
-		}
-	}
-
-	return string(plainText), key
+// _englishLetterFrequencies is a table of the frequencies of each letter in
+// English text.
+// Taken from
+// https://www3.nd.edu/~busiforc/handouts/cryptography/letterfrequencies.html
+var _englishLetterFrequencies = [26]float64{
+	// a        b        c         d        e
+	0.084966, 0.020720, 0.045388, 0.033844, 0.111607,
+	// f        g        h         i        j
+	0.018121, 0.024705, 0.030034, 0.075448, 0.001965,
+	// k        l        m         n        o
+	0.011016, 0.054893, 0.030129, 0.066544, 0.071635,
+	// p        q        r         s        t
+	0.031671, 0.001962, 0.075809, 0.057351, 0.069509,
+	// u        v        w         x        y
+	0.036308, 0.010074, 0.012899, 0.002902, 0.017779,
+	// z
+	0.002722,
 }
 
-// xorWithChar XORs each byte of data with the provided character.
-func xorWithChar(data []byte, char byte) []byte {
-	result := make([]byte, len(data))
-	for i, b := range data {
-		result[i] = b ^ char
-	}
-	return result
-}
-
-// computeTextScore calculates and returns a score for the given text based on
+// ComputeScore calculates and returns a score for the given UTF-8 text based on
 // how closely its character frequencies match typical English text. A higher
 // score indicates a closer match to valid English.
-func computeTextScore(data []byte) float64 {
+func ComputeScore(data []byte) float64 {
 	const uppercaseToLowercaseShift = 'a' - 'A'
 	var (
 		// we use [utf8.RuneCountInString] instead of len(text) because

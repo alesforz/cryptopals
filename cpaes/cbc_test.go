@@ -1,4 +1,4 @@
-package main
+package cpaes
 
 import (
 	"bytes"
@@ -6,9 +6,11 @@ import (
 	"io"
 	"os"
 	"testing"
+
+	"github.com/alesforz/cryptopals/cppad"
 )
 
-func TestAesCbcEncryption(t *testing.T) {
+func TestEncryptCBC(t *testing.T) {
 	var (
 		plainText = []byte("Lorem ipsum dolor sit amet consectetur adipiscin")
 		key       = []byte("YELLOW SUBMARINE")
@@ -18,25 +20,23 @@ func TestAesCbcEncryption(t *testing.T) {
 		iv[i] = byte(0)
 	}
 
-	cipherText, err := encryptAesCbc(plainText, key, iv)
+	cipherText, err := encryptCBC(plainText, key, iv)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	decrypted, err := decryptAesCbc(cipherText, key, iv)
+	decrypted, err := decryptCBC(cipherText, key, iv)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	if !bytes.Equal(delPadPkcs7(decrypted), plainText) {
-		const formatStr = "original plain text and decrypted plain text differ:\noriginal: %q\ndecrypted: %q"
-
-		t.Errorf(formatStr, plainText, decrypted)
+	if !bytes.Equal(cppad.RemovePKCS7(decrypted), plainText) {
+		t.Errorf("want: %q\ngot: %q\n", plainText, decrypted)
 	}
 }
 
-func TestAesCbcDecryption(t *testing.T) {
-	f, err := os.Open("./files/2_10.txt")
+func TestDecryptCBC(t *testing.T) {
+	f, err := os.Open("../files/c10.txt")
 	if err != nil {
 		t.Fatalf("opening file: %s", err)
 	}
@@ -56,7 +56,7 @@ func TestAesCbcDecryption(t *testing.T) {
 		iv[i] = byte(0)
 	}
 
-	plainText, err := decryptAesCbc(cipherText, key, iv)
+	plainText, err := decryptCBC(cipherText, key, iv)
 	if err != nil {
 		t.Error(err)
 	}
