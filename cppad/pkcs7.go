@@ -37,15 +37,25 @@ func RemovePKCS7(data []byte) []byte {
 	if len(data) == 0 {
 		return data
 	}
-	// TODO:
-	// - check if last byte is 0: can't have padding of 0
-	// - check if last byte is > len(data): can't have padding of more than len(data)
-	// - check that the last pad_size bytes of data are all equal to the last byte
 
 	var (
-		pad      = int(data[len(data)-1])
-		unpadded = make([]byte, len(data)-pad)
+		dLen     = len(data)
+		lastByte = data[len(data)-1]
 	)
+	if lastByte == 0 {
+		panic("last padding byte is 0")
+	}
+	if dLen < int(lastByte) {
+		panic("last padding byte is greater than length of data")
+	}
+	for i := dLen - 1; i > dLen-int(lastByte)-1; i-- {
+		if data[i] != lastByte {
+			panic("padding bytes are not all equal")
+		}
+	}
+
+	unpadded := make([]byte, dLen-int(lastByte))
+
 	// copy copies the minimum of len(unpadded) and len(data) bytes from data to
 	// unpadded, therefore it copies only the unpadded bytes.
 	copy(unpadded, data)
