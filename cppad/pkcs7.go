@@ -37,6 +37,10 @@ func RemovePKCS7(data []byte) []byte {
 	if len(data) == 0 {
 		return data
 	}
+	// TODO:
+	// - check if last byte is 0: can't have padding of 0
+	// - check if last byte is > len(data): can't have padding of more than len(data)
+	// - check that the last pad_size bytes of data are all equal to the last byte
 
 	var (
 		pad      = int(data[len(data)-1])
