@@ -1,5 +1,7 @@
 package cppad
 
+import "errors"
+
 // PKCS7 pads the given data to a multiple of size by appending the number of bytes
 // of padding to the end of the it.
 // For example, "YELLOW SUBMARINE" (16 bytes) padded to 20 bytes is:
@@ -33,9 +35,9 @@ func PKCS7(data []byte, size uint8) []byte {
 // removed.
 // RemovePKCS7 does not modify the input slice; rather, it returns a new slice
 // with the padding removed.
-func RemovePKCS7(data []byte) []byte {
+func RemovePKCS7(data []byte) ([]byte, error) {
 	if len(data) == 0 {
-		return data
+		return data, nil
 	}
 
 	var (
@@ -43,14 +45,14 @@ func RemovePKCS7(data []byte) []byte {
 		lastByte = data[len(data)-1]
 	)
 	if lastByte == 0 {
-		panic("last padding byte is 0")
+		return nil, errors.New("last padding byte is 0")
 	}
 	if dLen < int(lastByte) {
-		panic("last padding byte is greater than length of data")
+		return nil, errors.New("last padding byte is greater than length of data")
 	}
 	for i := dLen - 1; i > dLen-int(lastByte)-1; i-- {
 		if data[i] != lastByte {
-			panic("padding bytes are not all equal")
+			return nil, errors.New("padding bytes are not all equal")
 		}
 	}
 
@@ -60,5 +62,5 @@ func RemovePKCS7(data []byte) []byte {
 	// unpadded, therefore it copies only the unpadded bytes.
 	copy(unpadded, data)
 
-	return unpadded
+	return unpadded, nil
 }

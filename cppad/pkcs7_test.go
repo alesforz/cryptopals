@@ -20,7 +20,11 @@ func TestPKCS7(t *testing.T) {
 
 func TestRemovePKCS7(t *testing.T) {
 	t.Run("EmptySlice", func(t *testing.T) {
-		if !(len(RemovePKCS7([]byte{})) == 0) {
+		got, err := RemovePKCS7([]byte{})
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if len(got) > 0 {
 			t.Errorf("expected empty slice")
 		}
 	})
@@ -35,32 +39,38 @@ func TestRemovePKCS7(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		want := data[:9]
-		got := RemovePKCS7(data)
+		got, err := RemovePKCS7(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
 		if !bytes.Equal(got, want) {
 			t.Errorf("\nwant: %q\ngot: %q\n", want, got)
 		}
 	})
 
-	assertPanic := func(t *testing.T, data []byte) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Errorf("expected code to panic")
-			}
-		}()
-		RemovePKCS7(data)
-	}
-
 	t.Run("LastByteZero", func(t *testing.T) {
 		data[len(data)-1] = 0
-		assertPanic(t, data)
+
+		_, err := RemovePKCS7(data)
+		if err == nil {
+			t.Errorf("wanted error, but got nil")
+		} else if err.Error() != "last padding byte is 0" {
+			t.Errorf("unexpected error: %s", err)
+		}
 
 		// restore the last byte for the next test
 		data[len(data)-1] = pad
 	})
 
 	t.Run("LastByteGreaterThanLength", func(t *testing.T) {
-		data[len(data)-1] = 8
-		assertPanic(t, data)
+		data[len(data)-1] = 20
+
+		_, err := RemovePKCS7(data)
+		if err == nil {
+			t.Errorf("wanted error, but got nil")
+		} else if err.Error() != "last padding byte is greater than length of data" {
+			t.Errorf("unexpected error: %s", err)
+		}
 
 		// restore the last byte for the next test
 		data[len(data)-1] = pad
@@ -68,6 +78,12 @@ func TestRemovePKCS7(t *testing.T) {
 
 	t.Run("PaddingBytesNotEqual", func(t *testing.T) {
 		data[len(data)-2] = 0x04
-		assertPanic(t, data)
+
+		_, err := RemovePKCS7(data)
+		if err == nil {
+			t.Errorf("wanted error, but got nil")
+		} else if err.Error() != "padding bytes are not all equal" {
+			t.Errorf("unexpected error: %s", err)
+		}
 	})
 }

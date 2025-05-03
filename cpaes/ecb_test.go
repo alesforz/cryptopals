@@ -33,7 +33,10 @@ func TestEncryptECB(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	unpadded := cppad.RemovePKCS7(decrypted)
+	unpadded, err := cppad.RemovePKCS7(decrypted)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
 	if !bytes.Equal(unpadded, plainText) {
 		t.Errorf("want: %q\ngot: %q", plainText, decrypted)
 	}
