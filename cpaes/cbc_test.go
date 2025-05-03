@@ -30,7 +30,11 @@ func TestEncryptCBC(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	if !bytes.Equal(cppad.RemovePKCS7(decrypted), plainText) {
+	unpadded, err := cppad.RemovePKCS7(decrypted)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if !bytes.Equal(unpadded, plainText) {
 		t.Errorf("want: %q\ngot: %q\n", plainText, decrypted)
 	}
 }

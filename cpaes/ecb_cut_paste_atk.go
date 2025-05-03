@@ -67,5 +67,10 @@ func cutAndPasteAtk(ECBEncOracle, ECBDecOracle Oracle) []byte {
 	// block 2: adminXXXXXXXXXXX   from cipherText2
 	adminCipherText := slices.Concat(cipherText1[:32], cipherText2[16:32])
 
-	return cppad.RemovePKCS7(ECBDecOracle(adminCipherText))
+	adminCookie, err := cppad.RemovePKCS7(ECBDecOracle(adminCipherText))
+	if err != nil {
+		panic("removing PKCS7 pad: " + err.Error())
+	}
+
+	return adminCookie
 }
