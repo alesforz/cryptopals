@@ -1,4 +1,4 @@
-// Code in this file solves challenge 12 of set 2 of the Cryptopals.
+// Code in this file solves challenge 12 and 14 of set 2 of the Cryptopals.
 package cpaes
 
 import (
@@ -324,4 +324,217 @@ func guessByte(forgedBlk, targetBlk []byte, blkIdx int, ECBOracle Oracle) byte {
 
 	// we should never reach this point
 	panic("couldn't guess correct byte of cipher text")
+}
+
+// ==================================================================================
+
+// byteAtTimeAtkWithPrefix implements a byte-at-a-time decryption attack, aka
+// padding oracle attack. It is a more difficult version of the attack implemented in
+// byteAtTimeAtk above. Namely, the ecbOracle now encrypts:
+// AES-128-ECB(random-prefix || attacker-controlled || target-bytes, random-key)
+// i.e., it pre-pends a random prefix of random bytes at the beginning of the
+// plain text before encryption.
+// The strategy we implement is to figure out the length of the random prefix, so
+// that we can skip it, thus reducing this attack to its simpler version we
+// implemented in byteAtTimeAtk.
+// Challenge 14 of set 2.
+func byteAtTimeAtkWithPrefix(ecbOracle Oracle) ([]byte, error) {
+	blkSize, _ := findECBBlockSizeAndSuffixLength(ecbOracle)
+	fmt.Println("block size:", blkSize)
+
+	prefixLen := findPrefixLen(blkSize, ecbOracle)
+	fmt.Println("prefix length:", prefixLen)
+
+	var (
+		// We build a "wrapper oracle" around the input ecbOracle to turn it from
+		// ECB(random-prefix || our-bytes || secret)
+		// to an oracle behaving like the easier version of the attack, that is:
+		// ECB(our-bytes || secret).
+
+		// Here we calculate how many 0x00 bytes we must prepend so that
+		// (random-prefix || filler) ends on a block boundary (read below)
+		fillBytesAfterPrefix = blkSize - prefixLen%blkSize
+
+		// wrapperOracle basically hides the random prefix from the byteAtTimeAtk
+		// function, making it behave like the oracle that we used in the
+		// implementation of that attack.
+		wrapperOracle = Oracle(func(plainText []byte) []byte {
+			// For example, P=prefix, T=our text, S=Secret, *=padding
+			// PPPPPPPPPPTTTTTT
+			// SSSSSSSS********
+			// fillBytesAfterPrefix is 6, so that the block becomes (before
+			// encryption):
+			// PPPPPPPPPP000000
+			// TTTTTTSSSSSSSS**
+			forgedPlainText := make([]byte, fillBytesAfterPrefix+len(plainText))
+			copy(forgedPlainText[fillBytesAfterPrefix:], plainText)
+
+			// Because we have added filler bytes, the oracle will return the
+			// encryption a this block:
+			// PPPPPPPPPP000000
+			// TTTTTTSSSSSSSS**
+			// As you can see, (prefix||filler) aligns with the block boundary.
+			// By doing this, we have reduced the problem to the simpler
+			// byte-at-a-time attack! Our chosen plain text will always start at the
+			// beginning of a new block, thus allowing us to use the simpler attack
+			// function that we implemented above.
+			cipherText := ecbOracle(forgedPlainText)
+
+			// All we have to do now, is stripping off the oracle's random prefix
+			// (plus the filler) from the ciphertext before passing it back to the
+			// simpler byte-at-a-time routine.
+			return cipherText[prefixLen+fillBytesAfterPrefix:]
+		})
+	)
+	// might as well use the smarter version :P
+	return byteAtTimeAtk2(wrapperOracle)
+}
+
+// ecbEncryptionOracleWithPrefix returns an AES oracle that:
+// - prepends a a random-length string of random bytes to the given plain text
+// - appends a secret string to the given plain text
+// then encrypts it all using AES ECB. That is:
+// AES-ECB(random-prefix || plain-text|| secret, random-key)
+// ecbEncryptionOracleWithSecret generates a random encryption key that the oracle
+// will use to encrypt.
+// Part of challenge 14 of set 2.
+func ecbEncryptionOracleWithPrefix() (Oracle, error) {
+	randPrefix, err := cpbytes.Random(0, 100)
+	if err != nil {
+		return nil, fmt.Errorf("generating random prefix: %s", err)
+	}
+
+	oracleWithSecret, err := ecbEncryptionOracleWithSecret()
+	if err != nil {
+		return nil, fmt.Errorf("creating oracle: %s", err)
+	}
+
+	oracle := func(plainText []byte) []byte {
+		pp := make([]byte, len(randPrefix)+len(plainText))
+		copy(pp, randPrefix)
+		copy(pp[len(randPrefix):], plainText)
+
+		return oracleWithSecret(pp)
+	}
+
+	return oracle, nil
+}
+
+// findPrefixLen finds and returns the length of the random string of random bytes
+// that the given ecbOracle pre-pends to the plain text.
+// Part of challenge 14 of set 2.
+func findPrefixLen(blkSize int, ecbOracle Oracle) int {
+	var prefixLen int
+	// we leverage the fact that ECB is stateless and deterministic; the same 16 byte
+	// plaintext block will always produce the same 16 byte ciphertext.
+	// How? We feed increasing amounts of 0x00 until two identical ciphertext‐blocks
+	// appear, which must be two 0x00‐blocks we injected just past the random prefix.
+	// From that position you can back‐calculate exactly how many random bytes there
+	// are.
+	// Note that this solution assumes that the random string is truly random, i.e.,
+	// it's encryption will not produce two equal ECB blocks.
+	// For example:
+	// R=random string, 0=our 0x00 bytes, S=secret that we want to decrypt,
+	// *=padding after secret
+	// RRRRRRRRRRSSSSSS
+	// SS**************
+	// We now ask the oracle to encrypt and increasing amount of 0x00.
+	// The loop starts with fillBytes=blkSize*2, because we need at least two blocks
+	// worth of 0x00s to produce two identical encrypted blocks.
+	// After immediately adding the first 32 0x00, we
+	// have:
+	// RRRRRRRRRR000000
+	// 0000000000000000
+	// 0000000000SSSSSS
+	// SS**************
+	// Which does not produce two equal blocks, therefore we will exit the inner
+	// loop.
+	// From there, we keep adding 0x00 until we reach this point:
+	// RRRRRRRRRR000000
+	// 0000000000000000
+	// 0000000000000000
+	// SSSSSSSS********
+	// And now, in the inner loop, we will have a match! In simple terms, we want to
+	// align two 0x00‐blocks right after the random prefix.
+	for fillBytes := blkSize * 2; ; fillBytes++ {
+		var (
+			cipherText = ecbOracle(make([]byte, fillBytes))
+			prevBlk    = cipherText[:blkSize]
+			nBlks      = len(cipherText) / blkSize
+		)
+		for blkIdx := 1; blkIdx < nBlks; blkIdx++ {
+			var (
+				blkStart = blkIdx * blkSize
+				blkEnd   = blkStart + blkSize
+			)
+			if bytes.Equal(prevBlk, cipherText[blkStart:blkEnd]) {
+				// To continue the explanation above, we are now here:
+				// RRRRRRRRRR000000
+				// 0000000000000000
+				// 0000000000000000
+				// SSSSSSSS********
+				// How do we get the length of R?
+				// Looking at it, it seems we could just do
+				// blkSize-fillBytes_in_that_block = 16-6 = 10
+				// But what if the random string spans multiple blocks? For example:
+				// RRRRRRRRRRRRRRRR
+				// RRRRRRRRRR000000
+				// 0000000000000000
+				// 0000000000000000
+				// SSSSSSSS********
+				// the count would be wrong. The length of the random string is the
+				// sum of blocks it fills + its bytes at the current block!
+				//
+				// Let's try to compute all we need.
+				// We remove blkSize*2 because these are the two identical blocks and
+				// we don't need to take them into account.
+				// The result of this is the number of 0x00s that are in the same
+				// (last) block of the random string.
+				// In this example, we would have:
+				// 38-(16*2) = 38-32 = 6
+				fillBytes -= blkSize * 2
+
+				// now we compute the number of blocks that are positioned before the
+				// two equal blocks. These are the number of blocks that the random
+				// string occupies! For example:
+				// blkIdx 0: RRRRRRRRRR000000
+				// blkIdx 1: 0000000000000000
+				// blkIdx 2: 0000000000000000
+				// blkIdx 3: SSSSSSSS********
+				// This if condition will be true at blkIdx=2.
+				// Therefore, prevBlk is pointing to the block at blkIdx 1.
+				// How many blocks are there before prevBlk? 1:
+				// blkIdx-1 = 2-1 = 1
+				//
+				// Another example:
+				// blkIdx 0: RRRRRRRRRRRRRRRR
+				// blkIdx 1: RRRRRRRRRRRRRRRR
+				// blkIdx 2: RRRRRRRRRR000000
+				// blkIdx 3: 0000000000000000
+				// blkIdx 4: 0000000000000000
+				// blkIdx 5: SSSSSSSS********
+				// This if condition will be true at blkIdx=4.
+				// How many blocks are there before the two consecutive identical
+				// blocks? 3:
+				// blkIdx-1 = 4-1 = 3.
+				randStrBlks := blkIdx - 1
+
+				// Now that we know how many blocks the random string occupies, we
+				// can compute its exact length. We know it must be at most
+				// blkSize*randStrBlks
+				// Butthe random string might not fill the last block. In the
+				// examples above, the last block was always
+				// RRRRRRRRRR000000
+				// therefore doing blkSize*randStrBlks would also count the 0x00s
+				// which is wrong. Then, we must remove the 0x00 from the total
+				// count.
+				// Using the last graphic example above, we have:
+				// randStrBlks*blkSize - fillBytes = 3*16-6 = 42
+				// which is the correct length of the random string!
+				prefixLen = randStrBlks*blkSize - fillBytes
+				return prefixLen
+			}
+			prevBlk = cipherText[blkStart:blkEnd]
+		}
+	}
 }
