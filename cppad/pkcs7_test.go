@@ -46,6 +46,16 @@ func TestRemovePKCS7(t *testing.T) {
 		if !bytes.Equal(got, want) {
 			t.Errorf("\nwant: %q\ngot: %q\n", want, got)
 		}
+
+		challengeData := []byte("ICE ICE BABY\x04\x04\x04\x04")
+		want = []byte("ICE ICE BABY")
+		got, err = RemovePKCS7(challengeData)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("\nwant: %q\ngot: %q\n", want, got)
+		}
 	})
 
 	t.Run("LastByteZero", func(t *testing.T) {
@@ -53,7 +63,7 @@ func TestRemovePKCS7(t *testing.T) {
 
 		_, err := RemovePKCS7(data)
 		if err == nil {
-			t.Errorf("wanted error, but got nil")
+			t.Error("wanted error, but got nil")
 		} else if err.Error() != "last padding byte is 0" {
 			t.Errorf("unexpected error: %s", err)
 		}
@@ -67,7 +77,7 @@ func TestRemovePKCS7(t *testing.T) {
 
 		_, err := RemovePKCS7(data)
 		if err == nil {
-			t.Errorf("wanted error, but got nil")
+			t.Error("wanted error, but got nil")
 		} else if err.Error() != "last padding byte is greater than length of data" {
 			t.Errorf("unexpected error: %s", err)
 		}
@@ -81,9 +91,22 @@ func TestRemovePKCS7(t *testing.T) {
 
 		_, err := RemovePKCS7(data)
 		if err == nil {
-			t.Errorf("wanted error, but got nil")
+			t.Error("wanted error, but got nil")
 		} else if err.Error() != "padding bytes are not all equal" {
 			t.Errorf("unexpected error: %s", err)
+		}
+
+		challengeTestCases := [][]byte{
+			[]byte("ICE ICE BABY\x05\x05\x05\x05"),
+			[]byte("ICE ICE BABY\x01\x02\x03\x04"),
+		}
+		for i, tc := range challengeTestCases {
+			_, err = RemovePKCS7(tc)
+			if err == nil {
+				t.Errorf("tc %d: wanted error, but got nil", i)
+			} else if err.Error() != "padding bytes are not all equal" {
+				t.Errorf("tc %d: unexpected error: %s", i, err)
+			}
 		}
 	})
 }
