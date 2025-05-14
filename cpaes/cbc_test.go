@@ -16,9 +16,6 @@ func TestEncryptCBC(t *testing.T) {
 		key       = []byte("YELLOW SUBMARINE")
 		iv        = make([]byte, len(key))
 	)
-	for i := range iv {
-		iv[i] = byte(0)
-	}
 
 	cipherText, err := encryptCBC(plainText, key, iv)
 	if err != nil {
@@ -56,10 +53,6 @@ func TestDecryptCBC(t *testing.T) {
 		key = []byte("YELLOW SUBMARINE")
 		iv  = make([]byte, len(key))
 	)
-	for i := range iv {
-		iv[i] = byte(0)
-	}
-
 	plainText, err := decryptCBC(cipherText, key, iv)
 	if err != nil {
 		t.Error(err)

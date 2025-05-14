@@ -45,11 +45,11 @@ func encryptCBC(plainText, key, iv []byte) ([]byte, error) {
 	for i := 1; i < nBlocks; i++ {
 		var (
 			prevBlkStart = (i - 1) * blkSize
-			prevBlkEnd   = (i-1)*blkSize + blkSize
+			prevBlkEnd   = prevBlkStart + blkSize
 			prevBlk      = cipherText[prevBlkStart:prevBlkEnd]
 
 			currBlkStart = i * blkSize
-			currBlkEnd   = i*blkSize + blkSize
+			currBlkEnd   = currBlkStart + blkSize
 			currBlk      = plainText[currBlkStart:currBlkEnd]
 		)
 		nextBlk, err := cpxor.Blocks(prevBlk, currBlk)
@@ -69,6 +69,8 @@ func encryptCBC(plainText, key, iv []byte) ([]byte, error) {
 // In case of an error during decryption, it returns the error and the plain
 // text decrypted up to when the error occurred.
 // decryptCBC does not modify the input slices.
+// The plain text that it returns retains the padding. It's up to the caller to
+// remove it.
 // (Solves challenge 10 of set 2)
 func decryptCBC(cipherText, key, iv []byte) ([]byte, error) {
 	cLen, kLen := len(cipherText), len(key)
@@ -104,11 +106,11 @@ func decryptCBC(cipherText, key, iv []byte) ([]byte, error) {
 	for i := 1; i < nBlocks; i++ {
 		var (
 			prevBlkStart = (i - 1) * blkSize
-			prevBlkEnd   = (i-1)*blkSize + blkSize
+			prevBlkEnd   = prevBlkStart + blkSize
 			prevBlk      = cipherText[prevBlkStart:prevBlkEnd]
 
 			currBlkStart = i * blkSize
-			currBlkEnd   = i*blkSize + blkSize
+			currBlkEnd   = currBlkStart + blkSize
 			currBlk      = decrypter(cipherText[currBlkStart:currBlkEnd])
 		)
 		nextBlk, err := cpxor.Blocks(prevBlk, currBlk)

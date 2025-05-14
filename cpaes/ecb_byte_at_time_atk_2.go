@@ -221,3 +221,14 @@ func guessByte2(prefix, targetBlk []byte, oracle Oracle) byte {
 
 	panic("couldn't guess the byte of the cipher text")
 }
+
+// find common prefix between oracle(\b16) an oracle(b\1)
+// PPPXXXXXXXXXXXXX XXXYELLOWSUN****
+// PPPYELLOWSUN****
+// ...
+// i=13 PPPXXXXXXXXXXXXX YELLOWSUN****
+
+// PPPPPPPPPPPPPPPP PPXXXXXXXXXXXXXX XXYELLOWSUN*****
+// PPPPPPPPPPPPPPPP PPYELLOWSUN*****
+// ...
+// i=14 PPPPPPPPPPPPPPPP PPXXXXXXXXXXXXXX YELLOWSUN*******
