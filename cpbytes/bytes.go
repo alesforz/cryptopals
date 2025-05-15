@@ -3,6 +3,7 @@ package cpbytes
 import (
 	"crypto/rand"
 	"fmt"
+	"io"
 	"math/big"
 )
 
@@ -63,4 +64,25 @@ func Random(min, max uint) ([]byte, error) {
 	}
 
 	return buf, nil
+}
+
+// PrintBlocks prints the given byte slice to the given Writer as blocks of blkSize
+// size.
+// For example, given the slice:
+// ['a','a','a','a','a','a','a','a',] with blkSize=4
+// it will print:
+// [97 97 97 97 ]  aaaa
+// [97 97 97 97 ]  aaaa
+// PrintBlocks assumes that the length of the input slice is a multiple of blkSize.
+func PrintBlocks(bb []byte, blkSize uint, out io.Writer) {
+	nBlks := (uint(len(bb)) + blkSize - 1) / blkSize
+
+	for i := range nBlks {
+		var (
+			blkStart = i * blkSize
+			blkEnd   = blkStart + blkSize
+			blk      = bb[blkStart:blkEnd]
+		)
+		out.Write(fmt.Appendf(nil, "%-*v\t%s\n", 3, blk, blk))
+	}
 }

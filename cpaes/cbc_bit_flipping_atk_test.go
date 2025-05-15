@@ -3,7 +3,10 @@ package cpaes
 import (
 	"bytes"
 	"crypto/aes"
+	"os"
 	"testing"
+
+	"github.com/alesforz/cryptopals/cpbytes"
 )
 
 func TestCBCBitFlippingAtk(t *testing.T) {
@@ -17,20 +20,7 @@ func TestCBCBitFlippingAtk(t *testing.T) {
 		t.Error("attack unsuccessful")
 	}
 
-	printBlocks(t, plainText, aes.BlockSize)
-}
-
-func printBlocks(t *testing.T, bb []byte, blkSize uint) {
-	nBlks := (uint(len(bb)) + blkSize - 1) / blkSize
-
-	for i := range nBlks {
-		var (
-			blkStart = i * blkSize
-			blkEnd   = blkStart + blkSize
-			blk      = bb[blkStart:blkEnd]
-		)
-		t.Logf("%-*v\t%s\n", 3, blk, blk)
-	}
+	cpbytes.PrintBlocks(plainText, aes.BlockSize, os.Stdout)
 }
 
 func TestCBCBitFlippingAtk2(t *testing.T) {
