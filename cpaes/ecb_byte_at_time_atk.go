@@ -298,7 +298,7 @@ func makeBlockCipherTextCache(blkDict [][]byte, oracle Oracle) [][]byte {
 // [forgedBlk|guessByte].
 // blkIdx is the index in the ciphertext of the block we are currently decrypting.
 //
-// guessByte returns correctly guessed secret byte (0–255), or panics if no match
+// guessByte returns the correctly guessed secret byte (0–255), or panics if no match
 // is found.
 // Part of challenge 12 of set 2.
 func guessByte(forgedBlk, targetBlk []byte, blkIdx int, ECBOracle Oracle) byte {

@@ -181,6 +181,21 @@ func bytesToChunks(data []byte, chunkSize int) ([][]byte, error) {
 	return chunks, nil
 }
 
+// transposeAndFlattenBlocks transposes the chunks of the given blocks and flattens
+// them into a single slice of byte slices.
+// In the context of the byte-at-a-time attack, blocks stores some cipher texts split
+// into chunks of the same size (16 bytes).
+// The function works like 'zip' in other languages, that is, it only iterates over
+// the smallest slice of blocks.
+// For example:
+//
+// blocks = [ [ c1 | c2 | c3 ], [ c4 | c5 | c6 ], [ c7 | c8 | c9 ], [ c10 | c11 ] ]
+// where 'c' stands for chunk
+//
+// returns:
+// result = [ c1, c4, c7, c10, c2, c5, c8, c11 ]
+//
+// transposeAndFlattenBlocks does not modify the input slices.
 func transposeAndFlattenBlocks(blocks [][][]byte) [][]byte {
 	chunksPerBlk := len(blocks[0])
 	// find the minimum number of chunks per block because the next loop will only
@@ -199,8 +214,19 @@ func transposeAndFlattenBlocks(blocks [][][]byte) [][]byte {
 	return result
 }
 
-// prefix is 15 bytes longg
-// targetBlk is 16 bytes long
+// guessByte brute-forces a single unknown byte of the secret by comparing the
+// oracle's outputs for all 256 possible byte values against a target ciphertext
+// block.
+// prefix must be a block of length 15 (i.e., block size - 1) so that it can be
+// concatenated with the guess byte to form a 16-byte plaintext block to feed to the
+// oracle.
+// targetBlk is the ciphertext block (16 bytes) we aim to reproduce by encrypting
+// [prefix|guessByte].
+//
+// guessByte returns the correctly guessed secret byte (0–255), or panics if no match
+// is found.
+// guessByte does not modify the input slices.
+// Part of challenge 12 of set 2.
 func guessByte2(prefix, targetBlk []byte, oracle Oracle) byte {
 	var (
 		blkSize   = len(targetBlk)
