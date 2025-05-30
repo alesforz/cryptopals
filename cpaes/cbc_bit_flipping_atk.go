@@ -116,7 +116,7 @@ func cbcOraclesWithAffix() (enc, dec Oracle, _ error) {
 	}
 
 	dec = func(cipherText []byte) []byte {
-		plainText, err := decryptCBC(cipherText, key, iv)
+		plainText, err := decryptCBC(iv, cipherText, key)
 		if err != nil {
 			panic(err)
 		}

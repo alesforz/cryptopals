@@ -22,7 +22,7 @@ func TestEncryptCBC(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	decrypted, err := decryptCBC(cipherText, key, iv)
+	decrypted, err := decryptCBC(iv, cipherText, key)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -53,7 +53,7 @@ func TestDecryptCBC(t *testing.T) {
 		key = []byte("YELLOW SUBMARINE")
 		iv  = make([]byte, len(key))
 	)
-	plainText, err := decryptCBC(cipherText, key, iv)
+	plainText, err := decryptCBC(iv, cipherText, key)
 	if err != nil {
 		t.Error(err)
 	}

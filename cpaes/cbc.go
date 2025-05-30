@@ -72,7 +72,7 @@ func encryptCBC(plainText, key, iv []byte) ([]byte, error) {
 // The plain text that it returns retains the padding. It's up to the caller to
 // remove it.
 // (Solves challenge 10 of set 2)
-func decryptCBC(cipherText, key, iv []byte) ([]byte, error) {
+func decryptCBC(iv, cipherText, key []byte) ([]byte, error) {
 	cLen, kLen := len(cipherText), len(key)
 	if cLen%kLen != 0 {
 		const errStr = "cipher text's length (%d) is not a multiple of the decryption key's length (%d)"
