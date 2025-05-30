@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"fmt"
+	"slices"
 
 	"github.com/alesforz/cryptopals/cpbytes"
 	"github.com/alesforz/cryptopals/cpxor"
@@ -91,21 +92,15 @@ func cbcOraclesWithAffix() (enc, dec Oracle, _ error) {
 		return nil, nil, fmt.Errorf("generating random AES key: %s", err)
 	}
 
-	var (
-		prefLen = len(prefix)
-		sufLen  = len(suffix)
-	)
 	enc = func(plainText []byte) []byte {
 		plainText = bytes.ReplaceAll(plainText, []byte{';'}, []byte("%3B"))
 		plainText = bytes.ReplaceAll(plainText, []byte{'='}, []byte("%3D"))
 
-		var (
-			textLen            = len(plainText)
-			plainTextWithAffix = make([]byte, prefLen+textLen+sufLen)
+		plainTextWithAffix := slices.Concat(
+			[]byte(prefix),
+			plainText,
+			[]byte(suffix),
 		)
-		copy(plainTextWithAffix, prefix)
-		copy(plainTextWithAffix[prefLen:], plainText)
-		copy(plainTextWithAffix[prefLen+textLen:], suffix)
 
 		cipherText, err := encryptCBC(iv, plainTextWithAffix, key)
 		if err != nil {

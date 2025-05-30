@@ -6,6 +6,7 @@ import (
 	"crypto/aes"
 	"encoding/base64"
 	"fmt"
+	"slices"
 
 	"github.com/alesforz/cryptopals/cpbytes"
 )
@@ -100,13 +101,9 @@ func byteAtTimeAtk(ECBOracle Oracle) ([]byte, error) {
 
 				// A combination of known bytes, previously decrypted bytes of the
 				// secret, and the byte currently being guessed (the +1, which we
-				// will brute force.
-				forgedBlk = make([]byte, len(knownBytes)+len(secret)+1)
-			)
-			copy(forgedBlk, knownBytes)
-			copy(forgedBlk[len(knownBytes):], secret)
+				// will brute force).
+				forgedBlk = slices.Concat(knownBytes, secret, []byte{0x00})
 
-			var (
 				blkStart = blkIdx * blkSize
 				blkEnd   = blkStart + blkSize
 
@@ -194,9 +191,7 @@ func ecbEncryptionOracleWithSecret() (Oracle, error) {
 	}
 
 	oracle := func(plainText []byte) []byte {
-		plainTextWithSecret := make([]byte, len(plainText)+len(secret))
-		copy(plainTextWithSecret, plainText)
-		copy(plainTextWithSecret[len(plainText):], secret)
+		plainTextWithSecret := slices.Concat(plainText, secret)
 
 		cipherText, err := encryptECB(plainTextWithSecret, key)
 		if err != nil {
@@ -410,10 +405,7 @@ func ecbEncryptionOracleWithPrefix() (Oracle, error) {
 	}
 
 	oracle := func(plainText []byte) []byte {
-		pp := make([]byte, len(randPrefix)+len(plainText))
-		copy(pp, randPrefix)
-		copy(pp[len(randPrefix):], plainText)
-
+		pp := slices.Concat(randPrefix, plainText)
 		return oracleWithSecret(pp)
 	}
 
