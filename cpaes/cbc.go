@@ -13,7 +13,7 @@ import (
 // In case of an error during encryption, it returns the error and the cipher
 // text generated up to when the error occurred.
 // encryptCBC does not modify the input slices.
-func encryptCBC(plainText, key, iv []byte) ([]byte, error) {
+func encryptCBC(iv, plainText, key []byte) ([]byte, error) {
 	ivLen, kLen := len(iv), len(key)
 	if ivLen%kLen != 0 {
 		const errStr = "iv length (%d) is not a multiple of the key length (%d)"

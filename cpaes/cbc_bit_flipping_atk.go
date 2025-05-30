@@ -107,7 +107,7 @@ func cbcOraclesWithAffix() (enc, dec Oracle, _ error) {
 		copy(plainTextWithAffix[prefLen:], plainText)
 		copy(plainTextWithAffix[prefLen+textLen:], suffix)
 
-		cipherText, err := encryptCBC(plainTextWithAffix, key, iv)
+		cipherText, err := encryptCBC(iv, plainTextWithAffix, key)
 		if err != nil {
 			panic(err)
 		}

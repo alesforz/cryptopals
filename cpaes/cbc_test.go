@@ -17,7 +17,7 @@ func TestEncryptCBC(t *testing.T) {
 		iv        = make([]byte, len(key))
 	)
 
-	cipherText, err := encryptCBC(plainText, key, iv)
+	cipherText, err := encryptCBC(iv, plainText, key)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}

@@ -132,5 +132,5 @@ func randomEncryption(plainText []byte) ([]byte, error) {
 		return nil, fmt.Errorf(formatStr, err)
 	}
 
-	return encryptCBC(padded, key, iv)
+	return encryptCBC(iv, padded, key)
 }
