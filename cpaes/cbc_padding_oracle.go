@@ -8,74 +8,87 @@ import (
 
 	"github.com/alesforz/cryptopals/cpbytes"
 	"github.com/alesforz/cryptopals/cppad"
+	"github.com/alesforz/cryptopals/cpxor"
 )
 
-func cbcPaddingOracleAtk() error {
-	encOracle, decOracle, err := makePaddingOracleAtkOracles()
-	if err != nil {
-		return fmt.Errorf("attack failed: %s", err)
-	}
-
+func cbcPaddingOracleAtk() ([]byte, error) {
 	var (
-		blkSize           = aes.BlockSize
-		myIV              = make([]byte, blkSize)
-		recoveredXoredBlk = make([]byte, blkSize)
+		origIV, encOracle, decOracle = makePaddingOracleAtkOracles()
+		blkSize                      = aes.BlockSize
+		recoveredXoredBlk            = make([]byte, blkSize)
+		prevBlk                      = origIV
 
 		// recall that encOracle ignores its input
 		cipherText = encOracle([]byte{})
+		plainText  = make([]byte, 0, len(cipherText))
 	)
 
 	cipherTextBlks, err := cpbytes.BytesToChunks(cipherText, blkSize)
 	if err != nil {
-		return fmt.Errorf("attack failed: chunking cipher text: %s", err)
+		return nil, fmt.Errorf("attack failed: chunking cipher text: %s", err)
 	}
 
-	// i=1 0000000000000000
-	// i=2 0000000000000002
-	// i=3 0000000000000033
-	for i := 1; i <= blkSize; i++ {
-		guessIdx := blkSize - i
-		for b := range 256 {
-			myIV[guessIdx] = byte(b)
+	for blk := range cipherTextBlks {
+		// padBytes=1 0000000000000000
+		// padBytes=2 0000000000000002
+		// padBytes=3 0000000000000033
+		myIV := make([]byte, blkSize)
+		for padBytes := 1; padBytes <= blkSize; padBytes++ {
+			guessIdx := blkSize - padBytes
+			for b := range 256 {
+				myIV[guessIdx] = byte(b)
+				// recall that the decryption oracle expects IV to be pre-pended to
+				// cipher text
+				ct := slices.Concat(myIV, cipherTextBlks[blk])
+				forgedPlainTextBlk := decOracle(ct)
 
-			// recall that the decryption oracle expects IV to be pre-pended to
-			// cipher text
-			ct := slices.Concat(myIV, cipherTextBlks[0])
-			plainText := decOracle(ct)
-
-			_, hasValidPad := validatePadding(plainText)
-			if hasValidPad {
-				// plainText[guessIdx] is set to the correct padding value (==i)
-				fmt.Println("i:", i, "b:", b, "pt:", plainText[guessIdx])
-				recoveredXoredBlk[guessIdx] = byte(b) ^ byte(i)
-				break
+				_, hasValidPad := validatePadding(forgedPlainTextBlk)
+				if hasValidPad {
+					// plainText[guessIdx] is set to the correct padding value (==i)
+					// fmt.Println(
+					// 	"i:", padBytes,
+					// 	"b:", b,
+					// 	"pt:", forgedPlainTextBlk[guessIdx],
+					// )
+					recoveredXoredBlk[guessIdx] = byte(b) ^ byte(padBytes)
+					break
+				}
+			}
+			// prepare myIV for next round
+			for v := blkSize - 1; v >= guessIdx; v-- {
+				// bytes should be set so that plain text bytes from last to next
+				// guessIdx will be set to the next pad length.
+				myIV[v] ^= (byte(padBytes) ^ byte(padBytes+1))
 			}
 		}
-		// prepare myIV for next round
-		for v := blkSize - 1; v >= guessIdx; v-- {
-			// bytes should be set so that plain text bytes from last to next
-			// guessIdx will be set to the next pad length.
-			myIV[v] = byte(i + 1)
+
+		plainTextBlk, err := cpxor.Blocks(prevBlk, recoveredXoredBlk)
+		if err != nil {
+			return nil, fmt.Errorf("atk failed: %s", err)
 		}
+
+		// add recovered plain text block to the whole plain text we are
+		// reconstructing
+		plainText = append(plainText, plainTextBlk...)
+
+		// update prevBlk
+		prevBlk = cipherTextBlks[blk]
 	}
 
-	fmt.Println("recovered:", recoveredXoredBlk)
-	fmt.Println("myIV:", myIV)
-
-	return nil
+	return plainText, nil
 }
 
-func makePaddingOracleAtkOracles() (Oracle, Oracle, error) {
+func makePaddingOracleAtkOracles() ([]byte, Oracle, Oracle) {
 	blkSize := aes.BlockSize
 
 	iv, err := cpbytes.Random(uint(blkSize), uint(blkSize))
 	if err != nil {
-		return nil, nil, fmt.Errorf("generating random IV: %s", err)
+		panic(fmt.Sprintf("generating random IV: %s", err))
 	}
 
 	key, err := cpbytes.Random(uint(blkSize), uint(blkSize))
 	if err != nil {
-		return nil, nil, fmt.Errorf("generating random IV: %s", err)
+		panic(fmt.Sprintf("generating random key: %s", err))
 	}
 
 	var (
@@ -115,7 +128,7 @@ func makePaddingOracleAtkOracles() (Oracle, Oracle, error) {
 		return plainText
 	}
 
-	return encOracle, decOracle, nil
+	return iv, encOracle, decOracle
 }
 
 func validatePadding(plainText []byte) ([]byte, bool) {
