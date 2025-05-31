@@ -166,13 +166,13 @@ func bytesToChunks(data []byte, chunkSize int) ([][]byte, error) {
 	}
 
 	var (
-		// In AES ECB we expect the data to be a multiple of the block size, so this
+		// In AES we expect the data to be a multiple of the block size, so this
 		// division should be exact.
 		nChunks = len(data) / chunkSize
 		chunks  = make([][]byte, 0, nChunks)
 	)
 	for i := 0; i < len(data); i += chunkSize {
-		// no need to check for a smaller last chunk, because in ECB all chunks have
+		// no need to check for a smaller last chunk, because in AES all chunks have
 		// the same size.
 		chunkEnd := i + chunkSize
 		chunks = append(chunks, data[i:chunkEnd])

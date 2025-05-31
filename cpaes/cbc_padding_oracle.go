@@ -17,31 +17,50 @@ func cbcPaddingOracleAtk() error {
 	}
 
 	var (
-		blkSize = aes.BlockSize
-		myIV    = make([]byte, blkSize)
+		blkSize           = aes.BlockSize
+		myIV              = make([]byte, blkSize)
+		recoveredXoredBlk = make([]byte, blkSize)
 
 		// recall that encOracle ignores its input
 		cipherText = encOracle([]byte{})
 	)
-	// for i := 1; i <= blkSize; i++ {
-	for b := range 256 {
-		myIV[blkSize-1] = byte(b)
 
-		ct := slices.Concat(myIV, cipherText)
-
-		plainText := decOracle(slices.Concat(myIV, ct))
-
-		unpadded, hasValidPad := validatePadding(plainText)
-		if hasValidPad {
-			fmt.Println(unpadded)
-			fmt.Println(string(unpadded))
-			fmt.Println(b)
-			break
-		}
-		panic("did not find matching byte")
+	cipherTextBlks, err := bytesToChunks(cipherText, blkSize)
+	if err != nil {
+		return fmt.Errorf("attack failed: chunking cipher text: %s", err)
 	}
 
-	// }
+	// i=1 0000000000000000
+	// i=2 0000000000000002
+	// i=3 0000000000000033
+	for i := 1; i <= blkSize; i++ {
+		guessIdx := blkSize - i
+		for b := range 256 {
+			myIV[guessIdx] = byte(b)
+
+			// recall that the decryption oracle expects IV to be pre-pended to
+			// cipher text
+			ct := slices.Concat(myIV, cipherTextBlks[0])
+			plainText := decOracle(ct)
+
+			_, hasValidPad := validatePadding(plainText)
+			if hasValidPad {
+				// plainText[guessIdx] is set to the correct padding value (==i)
+				fmt.Println("i:", i, "b:", b, "pt:", plainText[guessIdx])
+				recoveredXoredBlk[guessIdx] = byte(b) ^ byte(i)
+				break
+			}
+		}
+		// prepare myIV for next round
+		for v := blkSize - 1; v >= guessIdx; v-- {
+			// bytes should be set so that plain text bytes from last to next
+			// guessIdx will be set to the next pad length.
+			myIV[v] = byte(i + 1)
+		}
+	}
+
+	fmt.Println("recovered:", recoveredXoredBlk)
+	fmt.Println("myIV:", myIV)
 
 	return nil
 }
