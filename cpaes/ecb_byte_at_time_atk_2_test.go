@@ -3,6 +3,8 @@ package cpaes
 import (
 	"bytes"
 	"testing"
+
+	"github.com/alesforz/cryptopals/cpbytes"
 )
 
 func TestByteAtTimeAtk2(t *testing.T) {
@@ -33,7 +35,7 @@ func TestBytesToChunks(t *testing.T) {
 		}
 	)
 
-	gotChunks, err := bytesToChunks(data, 16)
+	gotChunks, err := cpbytes.BytesToChunks(data, 16)
 	if err != nil {
 		t.Fatal(err)
 	}

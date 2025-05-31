@@ -9,6 +9,8 @@ import (
 	"crypto/aes"
 	"errors"
 	"fmt"
+
+	"github.com/alesforz/cryptopals/cpbytes"
 )
 
 // byteAtTimeAtk2 implements a byte-at-a-time decryption attack, aka padding oracle
@@ -138,7 +140,7 @@ func makeCipherTexts(blkSize int, oracle Oracle) ([][][]byte, error) {
 	)
 	for i := range cipherTexts {
 		forgedCipherText := oracle(make([]byte, blkSize-i-1))
-		cipherTexts[i], err = bytesToChunks(forgedCipherText, blkSize)
+		cipherTexts[i], err = cpbytes.BytesToChunks(forgedCipherText, blkSize)
 		if err != nil {
 			const errStr = "splitting forged cipher text %d into blocks: %s"
 			return nil, fmt.Errorf(errStr, i, err)
@@ -146,39 +148,6 @@ func makeCipherTexts(blkSize int, oracle Oracle) ([][][]byte, error) {
 	}
 
 	return cipherTexts, nil
-}
-
-// bytesToChunks splits the input data into chunks of the specified size.
-// It expects the length of the input data to be a multiple of the chunk size.
-// It returns a slice of byte slices, where each slice represents a chunk of the
-// input data.
-// It does not modify the input slice.
-// Part of challenge 12 of set 2.
-func bytesToChunks(data []byte, chunkSize int) ([][]byte, error) {
-	if len(data) == 0 {
-		return nil, errors.New("data is empty")
-	}
-	if chunkSize <= 0 {
-		return nil, errors.New("chunk size must be greater than 0")
-	}
-	if len(data)%chunkSize != 0 {
-		return nil, errors.New("data length is not a multiple of chunk size")
-	}
-
-	var (
-		// In AES we expect the data to be a multiple of the block size, so this
-		// division should be exact.
-		nChunks = len(data) / chunkSize
-		chunks  = make([][]byte, 0, nChunks)
-	)
-	for i := 0; i < len(data); i += chunkSize {
-		// no need to check for a smaller last chunk, because in AES all chunks have
-		// the same size.
-		chunkEnd := i + chunkSize
-		chunks = append(chunks, data[i:chunkEnd])
-	}
-
-	return chunks, nil
 }
 
 // transposeAndFlattenBlocks transposes the chunks of the given blocks and flattens
