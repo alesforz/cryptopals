@@ -45,14 +45,14 @@ func RemovePKCS7(data []byte) ([]byte, error) {
 		lastByte = data[len(data)-1]
 	)
 	if lastByte == 0 {
-		return nil, errors.New("last padding byte is 0")
+		return data, errors.New("last padding byte is 0")
 	}
 	if dLen < int(lastByte) {
-		return nil, errors.New("last padding byte is greater than length of data")
+		return data, errors.New("last padding byte is greater than length of data")
 	}
 	for i := dLen - 1; i > dLen-int(lastByte)-1; i-- {
 		if data[i] != lastByte {
-			return nil, errors.New("padding bytes are not all equal")
+			return data, errors.New("padding bytes are not all equal")
 		}
 	}
 
