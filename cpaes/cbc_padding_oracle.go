@@ -20,9 +20,8 @@ type paddingOracleAtkTools struct {
 
 func cbcPaddingOracleAtk(atkTools paddingOracleAtkTools) ([]byte, error) {
 	var (
-		blkSize           = aes.BlockSize
-		recoveredXoredBlk = make([]byte, blkSize)
-		prevBlk           = atkTools.iv
+		blkSize = aes.BlockSize
+		prevBlk = atkTools.iv
 
 		// recall that encOracle ignores its input
 		cipherText = atkTools.encryptionOracle([]byte{})
@@ -35,38 +34,15 @@ func cbcPaddingOracleAtk(atkTools paddingOracleAtkTools) ([]byte, error) {
 	}
 
 	for blk := range cipherTextBlks {
-		// padBytes=1 0000000000000000
-		// padBytes=2 0000000000000002
-		// padBytes=3 0000000000000033
-		myIV := make([]byte, blkSize)
-		for padBytes := 1; padBytes <= blkSize; padBytes++ {
-			guessIdx := blkSize - padBytes
-			for b := range 256 {
-				myIV[guessIdx] = byte(b)
-				// recall that the decryption oracle expects IV to be pre-pended to
-				// cipher text
-				ct := slices.Concat(myIV, cipherTextBlks[blk])
-				forgedPlainTextBlk := atkTools.decryptionOracle(ct)
-
-				_, hasValidPad := validatePadding(forgedPlainTextBlk)
-				if hasValidPad {
-					// plainText[guessIdx] is set to the correct padding value (==i)
-					// fmt.Println(
-					// 	"i:", padBytes,
-					// 	"b:", b,
-					// 	"pt:", forgedPlainTextBlk[guessIdx],
-					// )
-					recoveredXoredBlk[guessIdx] = byte(b) ^ byte(padBytes)
-					break
-				}
-			}
-			// prepare myIV for next round
-			for v := blkSize - 1; v >= guessIdx; v-- {
-				// bytes should be set so that plain text bytes from last to next
-				// guessIdx will be set to the next pad length.
-				myIV[v] ^= (byte(padBytes) ^ byte(padBytes+1))
-			}
-		}
+		var (
+			myIV          = make([]byte, blkSize)
+			cipherTextBlk = cipherTextBlks[blk]
+		)
+		recoveredXoredBlk := paddingOracleAtkBlk(
+			myIV,
+			cipherTextBlk,
+			atkTools.decryptionOracle,
+		)
 
 		plainTextBlk, err := cpxor.Blocks(prevBlk, recoveredXoredBlk)
 		if err != nil {
@@ -78,7 +54,7 @@ func cbcPaddingOracleAtk(atkTools paddingOracleAtkTools) ([]byte, error) {
 		plainText = append(plainText, plainTextBlk...)
 
 		// update prevBlk
-		prevBlk = cipherTextBlks[blk]
+		prevBlk = cipherTextBlk
 	}
 
 	return plainText, nil
@@ -142,6 +118,40 @@ func newPaddingOracleAtkTools() paddingOracleAtkTools {
 	}
 
 	return tools
+}
+
+func paddingOracleAtkBlk(iv, cipherTextBlk []byte, decOracle Oracle) []byte {
+	var (
+		blkSize      = aes.BlockSize
+		recoveredBlk = make([]byte, blkSize)
+	)
+	// padBytes=1 0000000000000000
+	// padBytes=2 0000000000000002
+	// padBytes=3 0000000000000033
+	for padBytes := 1; padBytes <= blkSize; padBytes++ {
+		guessIdx := blkSize - padBytes
+		for b := range 256 {
+			iv[guessIdx] = byte(b)
+			// recall that the decryption oracle expects IV to be pre-pended to
+			// cipher text
+			ct := slices.Concat(iv, cipherTextBlk)
+			forgedPlainTextBlk := decOracle(ct)
+
+			_, hasValidPad := validatePadding(forgedPlainTextBlk)
+			if hasValidPad {
+				// plainText[guessIdx] is set to the correct padding value (==i)
+				recoveredBlk[guessIdx] = byte(b) ^ byte(padBytes)
+				break
+			}
+		}
+		// prepare iv for next round
+		for v := blkSize - 1; v >= guessIdx; v-- {
+			// bytes should be set so that plain text bytes from last to next
+			// guessIdx will be set to the next pad length.
+			iv[v] ^= (byte(padBytes) ^ byte(padBytes+1))
+		}
+	}
+	return recoveredBlk
 }
 
 func validatePadding(plainText []byte) ([]byte, bool) {
