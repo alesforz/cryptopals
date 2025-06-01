@@ -23,7 +23,7 @@ func cbcPaddingOracleAtk() ([]byte, error) {
 		plainText  = make([]byte, 0, len(cipherText))
 	)
 
-	cipherTextBlks, err := cpbytes.BytesToChunks(cipherText, blkSize)
+	cipherTextBlks, err := cpbytes.ToChunks(cipherText, blkSize)
 	if err != nil {
 		return nil, fmt.Errorf("attack failed: chunking cipher text: %s", err)
 	}

@@ -140,7 +140,7 @@ func makeCipherTexts(blkSize int, oracle Oracle) ([][][]byte, error) {
 	)
 	for i := range cipherTexts {
 		forgedCipherText := oracle(make([]byte, blkSize-i-1))
-		cipherTexts[i], err = cpbytes.BytesToChunks(forgedCipherText, blkSize)
+		cipherTexts[i], err = cpbytes.ToChunks(forgedCipherText, blkSize)
 		if err != nil {
 			const errStr = "splitting forged cipher text %d into blocks: %s"
 			return nil, fmt.Errorf(errStr, i, err)

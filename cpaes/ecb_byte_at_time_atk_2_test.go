@@ -35,7 +35,7 @@ func TestBytesToChunks(t *testing.T) {
 		}
 	)
 
-	gotChunks, err := cpbytes.BytesToChunks(data, 16)
+	gotChunks, err := cpbytes.ToChunks(data, 16)
 	if err != nil {
 		t.Fatal(err)
 	}

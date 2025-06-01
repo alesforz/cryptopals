@@ -39,12 +39,12 @@ func AddNoise(data []byte, min, max uint) ([]byte, error) {
 	return buf, nil
 }
 
-// BytesToChunks splits the input data into chunks of the specified size.
+// ToChunks splits the input data into chunks of the specified size.
 // It expects the length of the input data to be a multiple of the chunk size.
 // It returns a slice of byte slices, where each slice represents a chunk of the
 // input data.
 // It does not modify the input slice.
-func BytesToChunks(data []byte, chunkSize int) ([][]byte, error) {
+func ToChunks(data []byte, chunkSize int) ([][]byte, error) {
 	if len(data) == 0 {
 		return nil, errors.New("data is empty")
 	}
