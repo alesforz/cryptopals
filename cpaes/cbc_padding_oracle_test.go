@@ -1,26 +1,16 @@
 package cpaes
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/alesforz/cryptopals/cppad"
 )
 
 func TestCbcPaddingOracleAtk(t *testing.T) {
-	plainTexts := map[string]struct{}{
-		"MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=":                             {},
-		"MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic=": {},
-		"MDAwMDAyUXVpY2sgdG8gdGhlIHBvaW50LCB0byB0aGUgcG9pbnQsIG5vIGZha2luZw==":         {},
-		"MDAwMDAzQ29va2luZyBNQydzIGxpa2UgYSBwb3VuZCBvZiBiYWNvbg==":                     {},
-		"MDAwMDA0QnVybmluZyAnZW0sIGlmIHlvdSBhaW4ndCBxdWljayBhbmQgbmltYmxl":             {},
-		"MDAwMDA1SSBnbyBjcmF6eSB3aGVuIEkgaGVhciBhIGN5bWJhbA==":                         {},
-		"MDAwMDA2QW5kIGEgaGlnaCBoYXQgd2l0aCBhIHNvdXBlZCB1cCB0ZW1wbw==":                 {},
-		"MDAwMDA3SSdtIG9uIGEgcm9sbCwgaXQncyB0aW1lIHRvIGdvIHNvbG8=":                     {},
-		"MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g=":                                 {},
-		"MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93":                 {},
-	}
+	atkTools := newPaddingOracleAtkTools()
 
-	plainText, err := cbcPaddingOracleAtk()
+	plainText, err := cbcPaddingOracleAtk(atkTools)
 	if err != nil {
 		t.Fatalf("attack failed: %s", err)
 	}
@@ -33,10 +23,9 @@ func TestCbcPaddingOracleAtk(t *testing.T) {
 		t.Fatalf("attack failed: unpadding recovered plain text: %s", err)
 	}
 
-	if _, ok := plainTexts[string(unpadded)]; !ok {
+	if !slices.Contains(atkTools.plainTexts, string(unpadded)) {
 		t.Fatalf("attack failed: recovered plain text:\n%s\n isn't one of those given by the challenge", unpadded)
 	}
 
 	t.Logf("Plain text: %s", unpadded)
-
 }

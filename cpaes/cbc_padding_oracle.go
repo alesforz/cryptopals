@@ -11,15 +11,21 @@ import (
 	"github.com/alesforz/cryptopals/cpxor"
 )
 
-func cbcPaddingOracleAtk() ([]byte, error) {
+type paddingOracleAtkTools struct {
+	encryptionOracle Oracle
+	decryptionOracle Oracle
+	plainTexts       []string
+	iv               []byte
+}
+
+func cbcPaddingOracleAtk(atkTools paddingOracleAtkTools) ([]byte, error) {
 	var (
-		origIV, encOracle, decOracle = makePaddingOracleAtkOracles()
-		blkSize                      = aes.BlockSize
-		recoveredXoredBlk            = make([]byte, blkSize)
-		prevBlk                      = origIV
+		blkSize           = aes.BlockSize
+		recoveredXoredBlk = make([]byte, blkSize)
+		prevBlk           = atkTools.iv
 
 		// recall that encOracle ignores its input
-		cipherText = encOracle([]byte{})
+		cipherText = atkTools.encryptionOracle([]byte{})
 		plainText  = make([]byte, 0, len(cipherText))
 	)
 
@@ -40,7 +46,7 @@ func cbcPaddingOracleAtk() ([]byte, error) {
 				// recall that the decryption oracle expects IV to be pre-pended to
 				// cipher text
 				ct := slices.Concat(myIV, cipherTextBlks[blk])
-				forgedPlainTextBlk := decOracle(ct)
+				forgedPlainTextBlk := atkTools.decryptionOracle(ct)
 
 				_, hasValidPad := validatePadding(forgedPlainTextBlk)
 				if hasValidPad {
@@ -78,7 +84,7 @@ func cbcPaddingOracleAtk() ([]byte, error) {
 	return plainText, nil
 }
 
-func makePaddingOracleAtkOracles() ([]byte, Oracle, Oracle) {
+func newPaddingOracleAtkTools() paddingOracleAtkTools {
 	blkSize := aes.BlockSize
 
 	iv, err := cpbytes.Random(uint(blkSize), uint(blkSize))
@@ -128,7 +134,14 @@ func makePaddingOracleAtkOracles() ([]byte, Oracle, Oracle) {
 		return plainText
 	}
 
-	return iv, encOracle, decOracle
+	tools := paddingOracleAtkTools{
+		encryptionOracle: encOracle,
+		decryptionOracle: decOracle,
+		plainTexts:       plainTexts,
+		iv:               iv,
+	}
+
+	return tools
 }
 
 func validatePadding(plainText []byte) ([]byte, bool) {
