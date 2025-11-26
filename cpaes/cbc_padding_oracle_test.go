@@ -1,6 +1,7 @@
 package cpaes
 
 import (
+	"encoding/base64"
 	"slices"
 	"testing"
 
@@ -28,4 +29,12 @@ func TestCbcPaddingOracleAtk(t *testing.T) {
 	}
 
 	t.Logf("Plain text: %s", unpadded)
+
+	decoded := make([]byte, len(unpadded))
+	_, err = base64.StdEncoding.Decode(decoded, unpadded)
+	if err != nil {
+		t.Fatalf("attack failed: base64 decoding recovered plain text: %s", err)
+	}
+
+	t.Logf("Decoded plain text: %s", decoded)
 }

@@ -18,6 +18,7 @@ type paddingOracleAtkTools struct {
 	iv               []byte
 }
 
+// Solves challenge 17 of set 3.
 func cbcPaddingOracleAtk(atkTools paddingOracleAtkTools) ([]byte, error) {
 	var (
 		blkSize = aes.BlockSize
