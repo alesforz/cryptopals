@@ -9,6 +9,18 @@ import (
 	"github.com/alesforz/cryptopals/cpxor"
 )
 
+// EncryptCTR encrypts the input byte slice using AES in CTR mode with the given key
+// and nonce.
+func EncryptCTR(input, key, nonce []byte) ([]byte, error) {
+	return ctr(input, key, nonce)
+}
+
+// DecryptCTR decrypts the input byte slice using AES in CTR mode with the given key
+// and nonce.
+func DecryptCTR(input, key, nonce []byte) ([]byte, error) {
+	return ctr(input, key, nonce)
+}
+
 // ctr performs AES encryption/decryption in CTR mode.
 // Since CTR mode is a stream cipher mode, encryption and decryption are the same
 // operation.
@@ -33,27 +45,10 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 			len(nonce),
 		)
 	}
-	var (
-		inputBlks [][]byte
-		err       error
-	)
-	if len(input)%aes.BlockSize == 0 {
-		if inputBlks, err = cpbytes.ToChunks(input, aes.BlockSize); err != nil {
-			return nil, fmt.Errorf("splitting cipher text into blocks: %s", err)
-		}
-	} else {
-		// CTR mode does not require padding, so we handle partial blocks separately
-		fullBlks := len(input) / aes.BlockSize
-		inputBlks, err = cpbytes.ToChunks(
-			input[:fullBlks*aes.BlockSize],
-			aes.BlockSize,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("splitting cipher text into blocks: %s", err)
-		}
-		// slice for that partial block
-		lastBlk := input[fullBlks*aes.BlockSize:]
-		inputBlks = append(inputBlks, lastBlk)
+
+	inputBlks, err := toChunks(input, aes.BlockSize)
+	if err != nil {
+		return nil, err
 	}
 
 	var (
@@ -95,4 +90,33 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 	}
 
 	return output, nil
+}
+
+// toChunks splits the input byte slice into chunks of the specified size.
+// If the input length is not a multiple of the chunk size, the last chunk will
+// be a partial chunk.
+// It does not modify the input slice.
+func toChunks(input []byte, chunkSize uint) ([][]byte, error) {
+	if uint(len(input))%chunkSize == 0 {
+		inputBlks, err := cpbytes.ToChunks(input, int(chunkSize))
+		if err != nil {
+			return nil, fmt.Errorf("splitting cipher text into blocks: %s", err)
+		}
+		return inputBlks, nil
+	}
+
+	// CTR mode does not require padding, so we handle partial blocks separately
+	fullBlks := uint(len(input)) / chunkSize
+	inputBlks, err := cpbytes.ToChunks(
+		input[:fullBlks*chunkSize],
+		int(chunkSize),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("splitting cipher text into blocks: %s", err)
+	}
+	// slice for that partial block
+	lastBlk := input[fullBlks*chunkSize:]
+	inputBlks = append(inputBlks, lastBlk)
+
+	return inputBlks, nil
 }
