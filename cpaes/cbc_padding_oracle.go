@@ -3,6 +3,7 @@ package cpaes
 
 import (
 	"crypto/aes"
+	"encoding/base64"
 	"fmt"
 	"math/rand/v2"
 	"slices"
@@ -107,11 +108,16 @@ func newPaddingOracleAtkTools() paddingOracleAtkTools {
 		}
 		idx       = rand.IntN(len(plainTexts))
 		plainText = []byte(plainTexts[idx])
+		decoded   = make([]byte, base64.StdEncoding.DecodedLen(len(plainText)))
 	)
+	_, err = base64.StdEncoding.Decode(decoded, plainText)
+	if err != nil {
+		panic(fmt.Sprintf("decoding chosen plain text from Base64: %s", err))
+	}
 
 	encryptOracle := func(_ []byte) []byte {
 		// encrypts one of the randomly chosen plain texts thus ignores its input
-		cipherText, err := encryptCBC(iv, plainText, key)
+		cipherText, err := encryptCBC(iv, decoded, key)
 		if err != nil {
 			panic(err)
 		}
