@@ -23,7 +23,7 @@ I go crazy when I hear a cymbal`
 		keyBytes       = []byte(key)
 	)
 
-	gotCipherText := encryptWithRepeatingKey(plainTextBytes, keyBytes)
+	gotCipherText := EncryptWithRepeatingKey(plainTextBytes, keyBytes)
 	if hex.EncodeToString(gotCipherText) != wantCipherText {
 		t.Errorf("want: %s\ngot: %s\n", wantCipherText, gotCipherText)
 	}

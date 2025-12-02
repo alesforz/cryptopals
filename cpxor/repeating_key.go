@@ -9,15 +9,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// encryptWithRepeatingKey encrypts the given text using repeating-key XOR.
+// EncryptWithRepeatingKey encrypts the given text using repeating-key XOR.
 // Each byte of the text is XORed with a corresponding byte from the key. If the
 // length of the text exceeds the length of the key, the key is repeated cyclically.
 // For example, if the text is "HELLO" and the key is "AB", the effective key
 // used for encryption would be "ABABA".
 // It returns the encrypted text as a new byte slice.
-// encryptWithRepeatingKey does not modify the input slices.
+// EncryptWithRepeatingKey does not modify the input slices.
 // (Solves challenge 5 of set 1).
-func encryptWithRepeatingKey(plainText, key []byte) []byte {
+func EncryptWithRepeatingKey(plainText, key []byte) []byte {
 	var (
 		cipherText = make([]byte, len(plainText))
 		keyLen     = len(key)
@@ -29,18 +29,18 @@ func encryptWithRepeatingKey(plainText, key []byte) []byte {
 	return cipherText
 }
 
-// decryptWithRepeatingKey decrypts the given text using repeating-key XOR.
+// DecryptWithRepeatingKey decrypts the given text using repeating-key XOR.
 // Each byte of the text is XORed with a corresponding byte from the key. If the
 // length of the text exceeds the length of the key, the key is repeated cyclically.
 // For example, if the ciphertext is "XXXX" and the key is "AB", the effective key
 // used for decryption would be "ABABA".
 // It returns the decrypted text as a new byte slice.
-// decryptWithRepeatingKey does not modify the input slices.
+// DecryptWithRepeatingKey does not modify the input slices.
 // This function is an alias for encryptWithRepeatingKey (since XORing a byte twice
 // with the same key byte results in the original byte) added for better readability
 // in the context of wanting to decrypt ciphertext.
-func decryptWithRepeatingKey(cipherText, key []byte) []byte {
-	return encryptWithRepeatingKey(cipherText, key)
+func DecryptWithRepeatingKey(cipherText, key []byte) []byte {
+	return EncryptWithRepeatingKey(cipherText, key)
 }
 
 // breakRepeatingKeyXORCipher attempts to decrypt a given cipher text encrypted
@@ -163,7 +163,7 @@ func breakRepeatingKeyXORCipher(
 		decryptionKey[k] = blockKey
 	}
 
-	plainText := decryptWithRepeatingKey(cipherText, decryptionKey)
+	plainText := DecryptWithRepeatingKey(cipherText, decryptionKey)
 
 	return plainText, decryptionKey, nil
 }
