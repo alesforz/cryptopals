@@ -110,3 +110,37 @@ func toChunks(input []byte, chunkSize uint) ([][]byte, error) {
 
 	return inputBlks, nil
 }
+
+func breakCTRWithFixedNonce(cipherTexts [][]byte) ([]byte, error) {
+	shortest := len(cipherTexts[0])
+	for i := 1; i < len(cipherTexts); i++ {
+		if len(cipherTexts[i]) < shortest {
+			shortest = len(cipherTexts[i])
+		}
+	}
+
+	recoveredKeyStream := make([]byte, shortest)
+	for colIdx := range shortest {
+		// try all printable ASCII characters as the key stream byte for this column
+		for char := 32; char <= 126; char++ {
+			guesses := make([]byte, 0, len(cipherTexts))
+			for _, ct := range cipherTexts {
+				guesses = append(guesses, ct[colIdx]^byte(char))
+			}
+			if isGoodGuess(guesses) {
+				recoveredKeyStream[colIdx] = byte(char)
+				break
+			}
+		}
+	}
+	return recoveredKeyStream, nil
+}
+
+func isGoodGuess(guesses []byte) bool {
+	for _, g := range guesses {
+		if g < 32 || g > 126 {
+			return false
+		}
+	}
+	return true
+}

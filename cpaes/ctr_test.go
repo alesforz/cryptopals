@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alesforz/cryptopals/cpbytes"
+	"github.com/alesforz/cryptopals/cpxor"
 )
 
 // Solves challenge 18 of set 3
@@ -88,8 +89,20 @@ func TestBreakCTRWithSubs(t *testing.T) {
 
 		ct, err := ctr(pt, key, nonce)
 		if err != nil {
-			t.Fatalf("encrypting CTR for plain text %d: %v", i, err)
+			t.Fatalf("encrypting with AES CTR plain text %d: %v", i, err)
 		}
 		cipherTexts[i] = ct
+	}
+
+	recoveredKeyStream, err := breakCTRWithFixedNonce(cipherTexts)
+	if err != nil {
+		t.Fatalf("breaking CTR with fixed nonce: %v", err)
+	}
+
+	t.Logf("Recovered key stream: %s", recoveredKeyStream)
+
+	for i, ct := range cipherTexts {
+		pt := cpxor.DecryptWithRepeatingKey(ct, recoveredKeyStream)
+		t.Logf("Recovered plain text %d: %s", i, string(pt))
 	}
 }
