@@ -11,13 +11,13 @@ import (
 
 // EncryptCTR encrypts the input byte slice using AES in CTR mode with the given key
 // and nonce.
-func EncryptCTR(input, key, nonce []byte) ([]byte, error) {
+func EncryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
 // DecryptCTR decrypts the input byte slice using AES in CTR mode with the given key
 // and nonce.
-func DecryptCTR(input, key, nonce []byte) ([]byte, error) {
+func DecryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
@@ -26,9 +26,8 @@ func DecryptCTR(input, key, nonce []byte) ([]byte, error) {
 // operation.
 // input is the byte slice to be encrypted/decrypted.
 // key is the AES key.
-// nonce is an 8-byte slice used as the nonce for CTR mode.
 // ctr does not modify the input slices.
-func ctr(input, key, nonce []byte) ([]byte, error) {
+func ctr(input, key []byte, nonce uint64) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, fmt.Errorf("input length must be greater than 0")
 	}
@@ -37,12 +36,6 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 			"AES key length must be a multiple of %d bytes, got %d bytes",
 			aes.BlockSize,
 			len(key),
-		)
-	}
-	if len(nonce) != 8 {
-		return nil, fmt.Errorf(
-			"nonce must be 8 bytes long, got %d bytes",
-			len(nonce),
 		)
 	}
 
@@ -61,10 +54,7 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 		return nil, fmt.Errorf("creating encryption oracle: %s", err)
 	}
 
-	binary.LittleEndian.PutUint64(
-		keystreamBlk[:8],
-		binary.LittleEndian.Uint64(nonce),
-	)
+	binary.LittleEndian.PutUint64(keystreamBlk[:8], nonce)
 	for i := range inputBlks {
 		// encrypt [nonce || counter] to get the keystream block
 		binary.LittleEndian.PutUint64(keystreamBlk[8:], counter)
@@ -119,4 +109,38 @@ func toChunks(input []byte, chunkSize uint) ([][]byte, error) {
 	inputBlks = append(inputBlks, lastBlk)
 
 	return inputBlks, nil
+}
+
+func breakCTRWithFixedNonce(cipherTexts [][]byte) ([]byte, error) {
+	shortest := len(cipherTexts[0])
+	for i := 1; i < len(cipherTexts); i++ {
+		if len(cipherTexts[i]) < shortest {
+			shortest = len(cipherTexts[i])
+		}
+	}
+
+	recoveredKeyStream := make([]byte, shortest)
+	for colIdx := range shortest {
+		// try all printable ASCII characters as the key stream byte for this column
+		for char := 32; char <= 126; char++ {
+			guesses := make([]byte, 0, len(cipherTexts))
+			for _, ct := range cipherTexts {
+				guesses = append(guesses, ct[colIdx]^byte(char))
+			}
+			if isGoodGuess(guesses) {
+				recoveredKeyStream[colIdx] = byte(char)
+				break
+			}
+		}
+	}
+	return recoveredKeyStream, nil
+}
+
+func isGoodGuess(guesses []byte) bool {
+	for _, g := range guesses {
+		if g < 32 || g > 126 {
+			return false
+		}
+	}
+	return true
 }
