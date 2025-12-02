@@ -11,13 +11,13 @@ import (
 
 // EncryptCTR encrypts the input byte slice using AES in CTR mode with the given key
 // and nonce.
-func EncryptCTR(input, key, nonce []byte) ([]byte, error) {
+func EncryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
 // DecryptCTR decrypts the input byte slice using AES in CTR mode with the given key
 // and nonce.
-func DecryptCTR(input, key, nonce []byte) ([]byte, error) {
+func DecryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
@@ -26,9 +26,8 @@ func DecryptCTR(input, key, nonce []byte) ([]byte, error) {
 // operation.
 // input is the byte slice to be encrypted/decrypted.
 // key is the AES key.
-// nonce is an 8-byte slice used as the nonce for CTR mode.
 // ctr does not modify the input slices.
-func ctr(input, key, nonce []byte) ([]byte, error) {
+func ctr(input, key []byte, nonce uint64) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, fmt.Errorf("input length must be greater than 0")
 	}
@@ -37,12 +36,6 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 			"AES key length must be a multiple of %d bytes, got %d bytes",
 			aes.BlockSize,
 			len(key),
-		)
-	}
-	if len(nonce) != 8 {
-		return nil, fmt.Errorf(
-			"nonce must be 8 bytes long, got %d bytes",
-			len(nonce),
 		)
 	}
 
@@ -61,10 +54,7 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 		return nil, fmt.Errorf("creating encryption oracle: %s", err)
 	}
 
-	binary.LittleEndian.PutUint64(
-		keystreamBlk[:8],
-		binary.LittleEndian.Uint64(nonce),
-	)
+	binary.LittleEndian.PutUint64(keystreamBlk[:8], nonce)
 	for i := range inputBlks {
 		// encrypt [nonce || counter] to get the keystream block
 		binary.LittleEndian.PutUint64(keystreamBlk[8:], counter)
