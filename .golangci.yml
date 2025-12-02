@@ -11,7 +11,7 @@ linters:
     - errcheck
     - ineffassign
     - gofmt
-    - unuse.github/d
+    - unused
 
 issues:
   max-issues-per-linter: 0
