@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/alesforz/cryptopals/cpbytes"
+	"github.com/alesforz/cryptopals/cptext"
 	"github.com/alesforz/cryptopals/cpxor"
 )
 
@@ -112,35 +113,33 @@ func toChunks(input []byte, chunkSize uint) ([][]byte, error) {
 }
 
 func breakCTRWithFixedNonce(cipherTexts [][]byte) ([]byte, error) {
-	shortest := len(cipherTexts[0])
+	longest := len(cipherTexts[0])
 	for i := 1; i < len(cipherTexts); i++ {
-		if len(cipherTexts[i]) < shortest {
-			shortest = len(cipherTexts[i])
+		if len(cipherTexts[i]) > longest {
+			longest = len(cipherTexts[i])
 		}
 	}
 
-	recoveredKeyStream := make([]byte, shortest)
-	for colIdx := range shortest {
+	recoveredKeyStream := make([]byte, longest)
+	for colIdx := range longest {
+		maxScore := -1.0
+		candidateKeyStreamByte := byte(0)
 		// try all printable ASCII characters as the key stream byte for this column
-		for char := 32; char <= 126; char++ {
-			guesses := make([]byte, 0, len(cipherTexts))
+		for char := range 255 {
+			ptColIdxGuesses := make([]byte, 0, len(cipherTexts))
 			for _, ct := range cipherTexts {
-				guesses = append(guesses, ct[colIdx]^byte(char))
+				if colIdx >= len(ct) {
+					continue
+				}
+				ptColIdxGuesses = append(ptColIdxGuesses, ct[colIdx]^byte(char))
 			}
-			if isGoodGuess(guesses) {
-				recoveredKeyStream[colIdx] = byte(char)
-				break
+			score := cptext.ComputeScore(ptColIdxGuesses)
+			if score > maxScore {
+				maxScore = score
+				candidateKeyStreamByte = byte(char)
 			}
 		}
+		recoveredKeyStream[colIdx] = candidateKeyStreamByte
 	}
 	return recoveredKeyStream, nil
-}
-
-func isGoodGuess(guesses []byte) bool {
-	for _, g := range guesses {
-		if g < 32 || g > 126 {
-			return false
-		}
-	}
-	return true
 }
