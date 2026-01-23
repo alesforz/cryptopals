@@ -101,6 +101,8 @@ func TestBreakCTRWithSubs(t *testing.T) {
 
 	t.Logf("Recovered key stream: %x", recoveredKeyStream)
 
+	// resulting decryption is this poem:
+	// https://poets.org/poem/easter-1916
 	for i, ct := range cipherTexts {
 		pt := cpxor.DecryptWithRepeatingKey(ct, recoveredKeyStream)
 		t.Logf("Recovered plain text %d: %s", i, string(pt))

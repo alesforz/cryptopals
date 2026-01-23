@@ -8,16 +8,16 @@ const (
 	// https://www3.nd.edu/~busiforc/handouts/cryptography/letterfrequencies.html
 	gSpaceFrequency = 0.1918182
 
-	// gCommonPunctuation applies to punctuation like ".,'\";:!?-"
+	// gCommonPunctuationBonus applies to punctuation like ".,'\";:!?-".
 	gCommonPunctuationBonus = 0.01
 
 	// Penalty weights for scoring non-letter characters.
-	// gNonPrintablePenalty applies to ASCII control bytes
+	// gNonPrintablePenalty applies to ASCII control bytes 0-31 and 127.
 	gNonPrintablePenalty = -0.75
-	// gDigitPenalty applies to ASCII digits '0'..'9'
+	// gDigitPenalty applies to ASCII digits '0'..'9'.
 	gDigitPenalty = -0.03
-	// gOddPunctPenalty applies to punctuation like []{}<>/\\|~`@#$%^&*_+=
-	gOddPunctPenalty = -0.08
+	// gOddPunctuationPenalty applies to punctuation like []{}<>/\\|~`@#$%^&*_+=.
+	gOddPunctuationPenalty = -0.08
 )
 
 // gEnglishLetterFrequencies is a table of the frequencies of each letter in
@@ -61,10 +61,22 @@ func ComputeScore(data []byte) float64 {
 			b += uppercaseToLowercaseShift
 		}
 
-		if b >= 'a' && b <= 'z' {
+		switch {
+		case b >= 'a' && b <= 'z':
 			score += gEnglishLetterFrequencies[b-'a']
-		} else if b == ' ' {
+		case b == ' ':
 			score += gSpaceFrequency
+		case b >= '0' && b <= '9':
+			score += gDigitPenalty
+		case isCommonPunctuation(b):
+			score += gCommonPunctuationBonus
+		// 127 is DEL
+		case b < ' ' || b == 127:
+			score += gNonPrintablePenalty
+		case isOddPunctuation(b):
+			score += gOddPunctuationPenalty
+		default:
+			score += gNonPrintablePenalty
 		}
 	}
 
@@ -75,4 +87,28 @@ func ComputeScore(data []byte) float64 {
 	// giving a metric that represents the "English-likeness" of the text on a
 	// per-character basis.
 	return score / nChars
+}
+
+func isCommonPunctuation(b byte) bool {
+	switch b {
+	case '.', ',', '\'', '"', ';', ':', '!', '?', '-':
+		return true
+	default:
+		return false
+	}
+}
+
+func isOddPunctuation(b byte) bool {
+	switch b {
+	case '#', '$', '%', '&', '(', ')', '*', '+', '/':
+		return true
+	case '<', '=', '>', '@':
+		return true
+	case '[', '\\', ']', '^', '_', '`':
+		return true
+	case '{', '|', '}', '~':
+		return true
+	default:
+		return false
+	}
 }
