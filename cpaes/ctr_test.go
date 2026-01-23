@@ -99,7 +99,7 @@ func TestBreakCTRWithSubs(t *testing.T) {
 		t.Fatalf("breaking CTR with fixed nonce: %v", err)
 	}
 
-	t.Logf("Recovered key stream: %s", recoveredKeyStream)
+	t.Logf("Recovered key stream: %x", recoveredKeyStream)
 
 	for i, ct := range cipherTexts {
 		pt := cpxor.DecryptWithRepeatingKey(ct, recoveredKeyStream)
