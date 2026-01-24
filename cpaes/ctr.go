@@ -6,25 +6,24 @@ import (
 	"fmt"
 
 	"github.com/alesforz/cryptopals/cpbytes"
-	"github.com/alesforz/cryptopals/cptext"
 	"github.com/alesforz/cryptopals/cpxor"
 )
 
-// EncryptCTR encrypts the input byte slice using AES in CTR mode with the given key
-// and nonce.
+// EncryptCTR encrypts the input byte slice using AES in CTR mode with the given
+// key and nonce.
 func EncryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
-// DecryptCTR decrypts the input byte slice using AES in CTR mode with the given key
-// and nonce.
+// DecryptCTR decrypts the input byte slice using AES in CTR mode with the given
+// key and nonce.
 func DecryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
 // ctr performs AES encryption/decryption in CTR mode.
-// Since CTR mode is a stream cipher mode, encryption and decryption are the same
-// operation.
+// Since CTR mode is a stream cipher mode, encryption and decryption are the
+// same operation.
 // input is the byte slice to be encrypted/decrypted.
 // key is the AES key.
 // ctr does not modify the input slices.
@@ -112,34 +111,39 @@ func toChunks(input []byte, chunkSize uint) ([][]byte, error) {
 	return inputBlks, nil
 }
 
+// breakCTRWithFixedNonce recovers the CTR keystream used to encrypt multiple
+// ciphertexts with the same AES key and nonce.
+// For each index of the ciphertexts, it collects each ciphertext byte at that index
+// into a column and solves for the most likely single-byte XOR key (the keystream
+// byte) using English scoring. That is, it finds the byte that, xor-ed with each
+// byte of the column, produces the most "english-looking" text.
+//
+// The returned keystream has the length of the longest ciphertext. Columns
+// with few samples (near the end of the longest ciphertexts) are lower
+// confidence.
+//
+// It does not modify the input slice.
+//
+// Solves challenge 19 of set 3
 func breakCTRWithFixedNonce(cipherTexts [][]byte) ([]byte, error) {
-	longest := len(cipherTexts[0])
+	ctLongest := len(cipherTexts[0])
 	for i := 1; i < len(cipherTexts); i++ {
-		if len(cipherTexts[i]) > longest {
-			longest = len(cipherTexts[i])
+		if len(cipherTexts[i]) > ctLongest {
+			ctLongest = len(cipherTexts[i])
 		}
 	}
 
-	recoveredKeyStream := make([]byte, longest)
-	for colIdx := range longest {
-		maxScore := -1.0
-		candidateKeyStreamByte := byte(0)
-		// try all printable ASCII characters as the key stream byte for this column
-		for char := range 255 {
-			ptColIdxGuesses := make([]byte, 0, len(cipherTexts))
-			for _, ct := range cipherTexts {
-				if colIdx >= len(ct) {
-					continue
-				}
-				ptColIdxGuesses = append(ptColIdxGuesses, ct[colIdx]^byte(char))
+	recoveredKeyStream := make([]byte, ctLongest)
+	for colIdx := range ctLongest {
+		ctColumn := make([]byte, 0, len(cipherTexts))
+		for _, ct := range cipherTexts {
+			if colIdx >= len(ct) {
+				continue
 			}
-			score := cptext.ComputeScore(ptColIdxGuesses)
-			if score > maxScore {
-				maxScore = score
-				candidateKeyStreamByte = byte(char)
-			}
+			ctColumn = append(ctColumn, ct[colIdx])
 		}
-		recoveredKeyStream[colIdx] = candidateKeyStreamByte
+		_, keyStreamByte := cpxor.BreakSingleByteXorCipher(ctColumn)
+		recoveredKeyStream[colIdx] = keyStreamByte
 	}
 	return recoveredKeyStream, nil
 }

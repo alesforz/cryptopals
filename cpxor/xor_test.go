@@ -35,7 +35,7 @@ func TestDecryptSingleByteXORCipher(t *testing.T) {
 			t.Fatalf("unexpected error: %s", err)
 		}
 
-		gotPlainText, gotKey := decryptSingleByteXORCipher(cipherText)
+		gotPlainText, gotKey := BreakSingleByteXorCipher(cipherText)
 
 		t.Logf("Key: %c\n", gotKey)
 		t.Logf("Decoded string: %s\n", gotPlainText)
@@ -62,7 +62,7 @@ func TestDecryptSingleByteXORCipher(t *testing.T) {
 				t.Fatalf("unexpected error: %s", err)
 			}
 
-			gotPlainText, gotKey := decryptSingleByteXORCipher(cipherText)
+			gotPlainText, gotKey := BreakSingleByteXorCipher(cipherText)
 
 			score := cptext.ComputeScore([]byte(gotPlainText))
 			if score > bestScore {

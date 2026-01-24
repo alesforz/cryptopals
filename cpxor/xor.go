@@ -26,6 +26,34 @@ func Blocks(b1, b2 []byte) ([]byte, error) {
 	return xored, nil
 }
 
+// BreakSingleByteXorCipher attempts to decrypt a given ciphertext by XORing it
+// against each 255 1-byte keys. It then checks which resulting plaintext has
+// character frequencies closest to typical English text.
+// BreakSingleByteXorCipher returns the decrypted plaintext and the key used to
+// decrypt it.
+// BreakSingleByteXorCipher does not modify the input slice.
+// (Solves challenges 3 and 4 of set 1).
+func BreakSingleByteXorCipher(cipherText []byte) ([]byte, byte) {
+	const asciiBytes = 256
+	var (
+		bestScore float64
+		plainText []byte
+		key       byte
+	)
+	for char := range asciiBytes {
+		decrypted := decryptWithChar(cipherText, byte(char))
+		score := cptext.ComputeScore(decrypted)
+
+		if score > bestScore {
+			bestScore = score
+			plainText = decrypted
+			key = byte(char)
+		}
+	}
+
+	return plainText, key
+}
+
 // hexStrs performs a bitwise XOR operation between two hexadecimal strings of equal
 // length and returns the result as a new hexadecimal string.
 // (Solves challenge 2 of set 1).
@@ -50,34 +78,6 @@ func hexStrs(s1, s2 string) (string, error) {
 	}
 
 	return hex.EncodeToString(xored), nil
-}
-
-// decryptSingleByteXORCipher attempts to decrypt a given ciphertext by XORing it
-// against each 255 1-byte keys. It then checks which resulting plaintext has
-// character frequencies closest to typical English text.
-// decryptSingleByteXORCipher returns the decrypted plaintext and the key used to
-// decrypt it.
-// decryptSingleByteXORCipher does not modify the input slice.
-// (Solves challenges 3 and 4 of set 1).
-func decryptSingleByteXORCipher(cipherText []byte) ([]byte, byte) {
-	const asciiBytes = 256
-	var (
-		bestScore float64
-		plainText []byte
-		key       byte
-	)
-	for char := range asciiBytes {
-		decrypted := decryptWithChar(cipherText, byte(char))
-		score := cptext.ComputeScore(decrypted)
-
-		if score > bestScore {
-			bestScore = score
-			plainText = decrypted
-			key = byte(char)
-		}
-	}
-
-	return plainText, key
 }
 
 // encryptWithChar XORs each byte of the input data slice with the provided

@@ -29,7 +29,7 @@ func TestDecryptCTR(t *testing.T) {
 }
 
 // Solves challenge 19 of set 3
-func TestBreakCTRWithSubs(t *testing.T) {
+func TestBreakCTRWithSubstitutions(t *testing.T) {
 	var (
 		plainTexts = []string{
 			"SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",

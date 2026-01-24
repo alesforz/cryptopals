@@ -158,7 +158,7 @@ func breakRepeatingKeyXORCipher(
 
 		var (
 			block       = transposedCipherText[blockStart:blockEnd]
-			_, blockKey = decryptSingleByteXORCipher(block)
+			_, blockKey = BreakSingleByteXorCipher(block)
 		)
 		decryptionKey[k] = blockKey
 	}
