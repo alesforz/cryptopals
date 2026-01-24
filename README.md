@@ -4,7 +4,7 @@ These challenges ask you to build and break crypto systems with attacks that app
 
 I'm currently (slowly) going through them.
 
-Last problem solved: [The CBC padding oracle](https://cryptopals.com/sets/3/challenges/17)
-(Challenge 17 of Set 3).
+Last problem solved: [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19)
+(Challenge 19 of Set 3).
 
 Note: I focus on solving the challenges rather than on having pristine code ;)

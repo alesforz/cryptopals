@@ -9,26 +9,25 @@ import (
 	"github.com/alesforz/cryptopals/cpxor"
 )
 
-// EncryptCTR encrypts the input byte slice using AES in CTR mode with the given key
-// and nonce.
-func EncryptCTR(input, key, nonce []byte) ([]byte, error) {
+// EncryptCTR encrypts the input byte slice using AES in CTR mode with the given
+// key and nonce.
+func EncryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
-// DecryptCTR decrypts the input byte slice using AES in CTR mode with the given key
-// and nonce.
-func DecryptCTR(input, key, nonce []byte) ([]byte, error) {
+// DecryptCTR decrypts the input byte slice using AES in CTR mode with the given
+// key and nonce.
+func DecryptCTR(input, key []byte, nonce uint64) ([]byte, error) {
 	return ctr(input, key, nonce)
 }
 
 // ctr performs AES encryption/decryption in CTR mode.
-// Since CTR mode is a stream cipher mode, encryption and decryption are the same
-// operation.
+// Since CTR mode is a stream cipher mode, encryption and decryption are the
+// same operation.
 // input is the byte slice to be encrypted/decrypted.
 // key is the AES key.
-// nonce is an 8-byte slice used as the nonce for CTR mode.
 // ctr does not modify the input slices.
-func ctr(input, key, nonce []byte) ([]byte, error) {
+func ctr(input, key []byte, nonce uint64) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, fmt.Errorf("input length must be greater than 0")
 	}
@@ -37,12 +36,6 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 			"AES key length must be a multiple of %d bytes, got %d bytes",
 			aes.BlockSize,
 			len(key),
-		)
-	}
-	if len(nonce) != 8 {
-		return nil, fmt.Errorf(
-			"nonce must be 8 bytes long, got %d bytes",
-			len(nonce),
 		)
 	}
 
@@ -61,10 +54,7 @@ func ctr(input, key, nonce []byte) ([]byte, error) {
 		return nil, fmt.Errorf("creating encryption oracle: %s", err)
 	}
 
-	binary.LittleEndian.PutUint64(
-		keystreamBlk[:8],
-		binary.LittleEndian.Uint64(nonce),
-	)
+	binary.LittleEndian.PutUint64(keystreamBlk[:8], nonce)
 	for i := range inputBlks {
 		// encrypt [nonce || counter] to get the keystream block
 		binary.LittleEndian.PutUint64(keystreamBlk[8:], counter)
@@ -119,4 +109,41 @@ func toChunks(input []byte, chunkSize uint) ([][]byte, error) {
 	inputBlks = append(inputBlks, lastBlk)
 
 	return inputBlks, nil
+}
+
+// breakCTRWithFixedNonce recovers the CTR keystream used to encrypt multiple
+// ciphertexts with the same AES key and nonce.
+// For each index of the ciphertexts, it collects each ciphertext byte at that index
+// into a column and solves for the most likely single-byte XOR key (the keystream
+// byte) using English scoring. That is, it finds the byte that, xor-ed with each
+// byte of the column, produces the most "english-looking" text.
+//
+// The returned keystream has the length of the longest ciphertext. Columns
+// with few samples (near the end of the longest ciphertexts) are lower
+// confidence.
+//
+// It does not modify the input slice.
+//
+// Solves challenge 19 of set 3
+func breakCTRWithFixedNonce(cipherTexts [][]byte) ([]byte, error) {
+	ctLongest := len(cipherTexts[0])
+	for i := 1; i < len(cipherTexts); i++ {
+		if len(cipherTexts[i]) > ctLongest {
+			ctLongest = len(cipherTexts[i])
+		}
+	}
+
+	recoveredKeyStream := make([]byte, ctLongest)
+	for colIdx := range ctLongest {
+		ctColumn := make([]byte, 0, len(cipherTexts))
+		for _, ct := range cipherTexts {
+			if colIdx >= len(ct) {
+				continue
+			}
+			ctColumn = append(ctColumn, ct[colIdx])
+		}
+		_, keyStreamByte := cpxor.BreakSingleByteXorCipher(ctColumn)
+		recoveredKeyStream[colIdx] = keyStreamByte
+	}
+	return recoveredKeyStream, nil
 }

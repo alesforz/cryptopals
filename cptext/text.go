@@ -2,16 +2,29 @@ package cptext
 
 import "unicode/utf8"
 
-// _spaceFrequency is the frequency of the space character in English text.
-// Taken from
-// https://www3.nd.edu/~busiforc/handouts/cryptography/letterfrequencies.html
-const _spaceFrequency = 0.1918182
+const (
+	// gSpaceFrequency is the frequency of the space character in English text.
+	// Taken from
+	// https://www3.nd.edu/~busiforc/handouts/cryptography/letterfrequencies.html
+	gSpaceFrequency = 0.1918182
 
-// _englishLetterFrequencies is a table of the frequencies of each letter in
+	// gCommonPunctuationBonus applies to punctuation like ".,'\";:!?-".
+	gCommonPunctuationBonus = 0.01
+
+	// Penalty weights for scoring non-letter characters.
+	// gNonPrintablePenalty applies to ASCII control bytes 0-31 and 127.
+	gNonPrintablePenalty = -0.75
+	// gDigitPenalty applies to ASCII digits '0'..'9'.
+	gDigitPenalty = -0.03
+	// gOddPunctuationPenalty applies to punctuation like []{}<>/\\|~`@#$%^&*_+=.
+	gOddPunctuationPenalty = -0.08
+)
+
+// gEnglishLetterFrequencies is a table of the frequencies of each letter in
 // English text.
 // Taken from
 // https://www3.nd.edu/~busiforc/handouts/cryptography/letterfrequencies.html
-var _englishLetterFrequencies = [26]float64{
+var gEnglishLetterFrequencies = [26]float64{
 	// a        b        c         d        e
 	0.084966, 0.020720, 0.045388, 0.033844, 0.111607,
 	// f        g        h         i        j
@@ -48,10 +61,22 @@ func ComputeScore(data []byte) float64 {
 			b += uppercaseToLowercaseShift
 		}
 
-		if b >= 'a' && b <= 'z' {
-			score += _englishLetterFrequencies[b-'a']
-		} else if b == ' ' {
-			score += _spaceFrequency
+		switch {
+		case b >= 'a' && b <= 'z':
+			score += gEnglishLetterFrequencies[b-'a']
+		case b == ' ':
+			score += gSpaceFrequency
+		case b >= '0' && b <= '9':
+			score += gDigitPenalty
+		case isCommonPunctuation(b):
+			score += gCommonPunctuationBonus
+		// 127 is DEL
+		case b < ' ' || b == 127:
+			score += gNonPrintablePenalty
+		case isOddPunctuation(b):
+			score += gOddPunctuationPenalty
+		default:
+			score += gNonPrintablePenalty
 		}
 	}
 
@@ -62,4 +87,28 @@ func ComputeScore(data []byte) float64 {
 	// giving a metric that represents the "English-likeness" of the text on a
 	// per-character basis.
 	return score / nChars
+}
+
+func isCommonPunctuation(b byte) bool {
+	switch b {
+	case '.', ',', '\'', '"', ';', ':', '!', '?', '-':
+		return true
+	default:
+		return false
+	}
+}
+
+func isOddPunctuation(b byte) bool {
+	switch b {
+	case '#', '$', '%', '&', '(', ')', '*', '+', '/':
+		return true
+	case '<', '=', '>', '@':
+		return true
+	case '[', '\\', ']', '^', '_', '`':
+		return true
+	case '{', '|', '}', '~':
+		return true
+	default:
+		return false
+	}
 }
