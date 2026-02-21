@@ -1,8 +1,10 @@
 package cpaes
 
 import (
+	"bufio"
 	"crypto/aes"
 	"encoding/base64"
+	"os"
 	"testing"
 
 	"github.com/alesforz/cryptopals/cpbytes"
@@ -107,4 +109,43 @@ func TestBreakCTRWithSubstitutions(t *testing.T) {
 		pt := cpxor.DecryptWithRepeatingKey(ct, recoveredKeyStream)
 		t.Logf("Recovered plain text %d: %s", i, string(pt))
 	}
+}
+
+func TestBreakCTRStatistically(t *testing.T) {
+	key, err := cpbytes.Random(uint(aes.BlockSize), uint(aes.BlockSize))
+	if err != nil {
+		t.Fatalf("generating random encryption key: %s", err)
+	}
+
+	f, err := os.Open("../files/c20.txt")
+	if err != nil {
+		t.Fatalf("reading c20.txt: %s", err)
+	}
+
+	var (
+		cipherTexts [][]byte
+		nonce       uint64
+		s           = bufio.NewScanner(f)
+		counter     uint
+	)
+	for s.Scan() {
+		ptB64 := s.Text()
+		pt, err := base64.StdEncoding.DecodeString(ptB64)
+		if err != nil {
+			t.Fatalf("decoding plain text %s from base64: %s", ptB64, err)
+		}
+
+		ct, err := ctr(pt, key, nonce)
+		if err != nil {
+			t.Fatalf(
+				"encrypting plain text %d\n%s\nwith AES CTR: %s", counter, pt, err,
+			)
+		}
+		cipherTexts = append(cipherTexts, ct)
+	}
+	if err := s.Err(); err != nil {
+		t.Fatalf("scanning files/c20.txt: %s", err)
+	}
+	f.Close()
+
 }
