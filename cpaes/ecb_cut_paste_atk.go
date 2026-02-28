@@ -22,7 +22,7 @@ func profileFor(email []byte) []byte {
 // parseProfile parses a profile cookie and returns a map of the key-value pairs.
 func parseProfile(cookie []byte) map[string]string {
 	profile := make(map[string]string, 3)
-	for _, part := range bytes.Split(cookie, []byte{'&'}) {
+	for part := range bytes.SplitSeq(cookie, []byte{'&'}) {
 		kv := bytes.Split(part, []byte{'='})
 		if len(kv) != 2 {
 			panic("invalid profile cookie")

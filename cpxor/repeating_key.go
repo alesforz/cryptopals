@@ -43,16 +43,35 @@ func DecryptWithRepeatingKey(cipherText, key []byte) []byte {
 	return EncryptWithRepeatingKey(cipherText, key)
 }
 
+// BreakRepeatingKeyXORCipherKnownSize decrypts a ciphertext encrypted with
+// repeating-key XOR when the key size is known. It transposes the ciphertext
+// into key-sized columns, recovers each key byte with single-byte XOR
+// breaking, and returns the plaintext and key.
+func BreakRepeatingKeyXORCipherKnownSize(
+	cipherText []byte,
+	keySize int,
+) ([]byte, []byte, error) {
+	if keySize <= 0 {
+		return nil, nil, fmt.Errorf("key size must be positive, got %d", keySize)
+	}
+	if keySize > len(cipherText) {
+		errStr := "key size %d exceeds cipher text length %d"
+		return nil, nil, fmt.Errorf(errStr, keySize, len(cipherText))
+	}
+
+	plainText, key, err := breakRepeatingKeyXORWithKnownSize(cipherText, keySize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("breaking repeating key XOR: %s", err)
+	}
+	return plainText, key, nil
+}
+
 // breakRepeatingKeyXORCipher attempts to decrypt a given cipher text encrypted
 // using repeating-key XOR:
 // 1. Determines the probable key size using statistical analysis.
-// 2. Transposes the cipher text by aligning bytes encrypted with the same key
-// byte.
-// 3. Recovers the decryption key with frequency analysis on each transposed
-// block to determine the key's byte used to encrypt that particular block.
-// 4. Decrypts the cipher text
-// Returns the decrypted text, the key used to encrypt/decrypt it , and an error (if
-// any).
+// 2. Delegates to the known-size breaker.
+// Returns the decrypted text, the key used to encrypt/decrypt it , and an error
+// (if any).
 // breakRepeatingKeyXORCipher does not modify the input slice.
 // (Solves challenge 6 of set 1).
 func breakRepeatingKeyXORCipher(
@@ -65,6 +84,13 @@ func breakRepeatingKeyXORCipher(
 		return nil, nil, fmt.Errorf("breaking repeating key XOR: %s", err)
 	}
 
+	return breakRepeatingKeyXORWithKnownSize(cipherText, keySize)
+}
+
+func breakRepeatingKeyXORWithKnownSize(
+	cipherText []byte,
+	keySize int,
+) ([]byte, []byte, error) {
 	var (
 		cipherTextLen        = len(cipherText)
 		transposedCipherText = make([]byte, cipherTextLen)
@@ -77,81 +103,32 @@ func breakRepeatingKeyXORCipher(
 		nBlocks = (cipherTextLen + keySize - 1) / keySize
 	)
 	// Loop through all indices of the input cipherText.
-	// Now that we have an estimation of the key's size, we break the
-	// ciphertext into blocks of keySize length and transpose them.
-	// The ciphertext is a sequence of bytes where each byte is encrypted using
-	// a corresponding byte of the key. For example, with a key of size 3, the
-	// 1st, 4th, 7th byte, etc., are all XORed against the first byte of the
-	// key, the 2nd, 5th, 8th bytes against the second byte of the key, and so
-	// on.
-	// To break the cipher, we have to analyze all bytes encrypted with the
-	// same key's byte together. This requires transposing the ciphertext so
-	// that all bytes encrypted by the first byte of the key are in the first
-	// "column", all bytes encrypted by the second byte of the key are in the
-	// second "column" and so on.
+	// Now that we have a key size, we break the ciphertext into blocks of
+	// keySize length and transpose them.
 	for cipherTextIndex, cipherTextByte := range cipherText {
 		var (
-			// The position of this byte within its block of the transposed
-			// cipher text. It determines which byte of the key was used to
-			// encrypt this particular byte of the cipher text.
-			// For example, for a key size of 3, byte positions 0, 3, 6,...
-			// will have byteIdx as 0; positions 1, 4, 7,... will have byteIdx
-			// 1, and so on.
-			byteIdx = cipherTextIndex % keySize
-
-			// The index of the block of the transposed cipher text in which
-			// this cipher text byte is located.
-			blockIdx = cipherTextIndex / keySize
-
-			// We are treating the transposed cipher text as a 2D matrix where
-			// byteIdx is the row and blockIdx is the column.
-			// That is, this is the index of this byte in the transposed matrix
-			// where each row represents a position in the key, and each column
-			// represents a sequential block of key-sized length.
+			byteIdx                 = cipherTextIndex % keySize
+			blockIdx                = cipherTextIndex / keySize
 			transposedCipherTextIdx = byteIdx*nBlocks + blockIdx
 		)
 
-		// Handle the case where we would be out-of-bounds due to an incomplete
-		// last block. We need to adjust the transposedIndex to ensure we don't
-		// go out of range.
 		if transposedCipherTextIdx >= cipherTextLen {
 			var (
-				// the current row in the transposed blocks.
-				currRow = byteIdx + 1
-
-				// how many bytes are missing in the last, incomplete block.
+				currRow               = byteIdx + 1
 				lastBlockMissingBytes = keySize - cipherTextLen%keySize
 			)
-			// By multiplying these two values, we obtain the total number of
-			// "missing" positions up to the current row.
-			// Subtracting this from transposedIndex adjusts the index to
-			// account for the absence of these positions in the transposed
-			// blocks.
 			transposedCipherTextIdx -= currRow * lastBlockMissingBytes
 		}
 
 		transposedCipherText[transposedCipherTextIdx] = cipherTextByte
 	}
 
-	// Put together the decryption key.
-	// For each block in the transposed cipher-text, the single-byte XOR key
-	// that produces the best looking histogram is the repeating-key XOR key's
-	// byte for that block.
 	decryptionKey := make([]byte, keySize)
 	for k := range keySize {
 		var (
-			// Define the start and end indices of the transposed block that
-			// corresponds to the k-th byte of the key.
-			// That is, this block contains all the bytes that were XORed with the
-			// same byte of the key during encryption.
 			blockStart = k * nBlocks
-
-			// remember that this is the transposed cipher text, therefore each row
-			// has nBlocks columns.
-			blockEnd = blockStart + nBlocks
+			blockEnd   = blockStart + nBlocks
 		)
-		// Ensure we don't go beyond the end of the transposed cipher text, which can
-		// happen if the last block is not full.
 		if blockEnd > len(transposedCipherText) {
 			blockEnd = len(transposedCipherText)
 		}
