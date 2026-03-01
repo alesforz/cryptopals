@@ -53,6 +53,25 @@ func TestBreakRepeatingKeyXORCipher(t *testing.T) {
 	t.Logf("Plain-text:\n%s", plainText)
 }
 
+func TestBreakRepeatingKeyXORKnownSize(t *testing.T) {
+	const (
+		plainText = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal"
+		key       = "ICE"
+	)
+
+	cipherText := EncryptWithRepeatingKey([]byte(plainText), []byte(key))
+	gotPlain, gotKey, err := BreakRepeatingKeyXORCipherKnownSize(cipherText, len(key))
+	if err != nil {
+		t.Fatalf("breaking repeating key XOR: %s", err)
+	}
+	if !slices.Equal(gotPlain, []byte(plainText)) {
+		t.Fatalf("want plain text: %q\ngot: %q\n", plainText, gotPlain)
+	}
+	if !slices.Equal(gotKey, []byte(key)) {
+		t.Fatalf("want key: %q\ngot: %q\n", key, gotKey)
+	}
+}
+
 func TestTransposeMatrix(t *testing.T) {
 	var (
 		cipherText = []byte{

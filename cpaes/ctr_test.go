@@ -1,8 +1,12 @@
 package cpaes
 
 import (
+	"bufio"
 	"crypto/aes"
 	"encoding/base64"
+	"math"
+	"os"
+	"slices"
 	"testing"
 
 	"github.com/alesforz/cryptopals/cpbytes"
@@ -106,5 +110,84 @@ func TestBreakCTRWithSubstitutions(t *testing.T) {
 	for i, ct := range cipherTexts {
 		pt := cpxor.DecryptWithRepeatingKey(ct, recoveredKeyStream)
 		t.Logf("Recovered plain text %d: %s", i, string(pt))
+	}
+}
+
+// Solve Challenge 20 of Set 3
+func TestBreakCTRStatistically(t *testing.T) {
+	key, err := cpbytes.Random(uint(aes.BlockSize), uint(aes.BlockSize))
+	if err != nil {
+		t.Fatalf("generating random encryption key: %s", err)
+	}
+
+	f, err := os.Open("../files/c20.txt")
+	if err != nil {
+		t.Fatalf("reading c20.txt: %s", err)
+	}
+
+	var (
+		cipherTexts [][]byte
+		plainTexts  [][]byte
+		nonce       uint64
+		s           = bufio.NewScanner(f)
+		minCtLen    = math.MaxInt
+	)
+	for s.Scan() {
+		ptB64 := s.Text()
+		pt, err := base64.StdEncoding.DecodeString(ptB64)
+		if err != nil {
+			t.Fatalf("decoding plain text %s from base64: %s", ptB64, err)
+		}
+
+		ct, err := ctr(pt, key, nonce)
+		if err != nil {
+			t.Fatalf("encrypting plain text %s with AES CTR: %s", ptB64, err)
+		}
+
+		cipherTexts = append(cipherTexts, ct)
+		// store plain texts to verify the result of breaking CTR statistically, but
+		// we won't use them in the actual breaking
+		plainTexts = append(plainTexts, pt)
+		if len(ct) < minCtLen {
+			minCtLen = len(ct)
+		}
+	}
+	if err := s.Err(); err != nil {
+		t.Fatalf("scanning files/c20.txt: %s", err)
+	}
+	f.Close()
+
+	// truncate all cipher texts to a common length
+	truncatedCts := make([][]byte, len(cipherTexts))
+	for i, ct := range cipherTexts {
+		truncatedCts[i] = ct[:minCtLen]
+	}
+
+	concatenated := make([]byte, 0, len(truncatedCts)*minCtLen)
+	for _, ct := range truncatedCts {
+		concatenated = append(concatenated, ct...)
+	}
+
+	_, keyStream, err := cpxor.BreakRepeatingKeyXORCipherKnownSize(
+		concatenated,
+		minCtLen,
+	)
+	if err != nil {
+		t.Fatalf("breaking CTR statistically: %s", err)
+	}
+
+	// decrypt all truncated cipher texts with the recovered key stream
+	for i, ct := range truncatedCts {
+		pt := cpxor.DecryptWithRepeatingKey(ct, keyStream)
+		want := plainTexts[i][:minCtLen]
+		if !slices.Equal(pt, want) {
+			t.Errorf(
+				"recovered plain text %d:\nwant: %q\ngot: %q\n",
+				i,
+				want,
+				pt,
+			)
+		}
+		t.Logf("%s\n", pt)
 	}
 }
