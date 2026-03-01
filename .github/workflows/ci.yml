@@ -22,14 +22,18 @@ jobs:
           cache: true
           cache-dependency-path: "go.sum"
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.64.8
-          install-mode: source
-          args: --timeout=5m
+      - name: Install golangci-lint
         env:
           GOTOOLCHAIN: local
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+
+      - name: Run golangci-lint
+        env:
+          GOTOOLCHAIN: local
+          GOLANGCI_LINT_CACHE: ${{ github.workspace }}/.golangci-lint-cache
+          GOCACHE: ${{ github.workspace }}/.gocache
+        run: |
+          golangci-lint run --timeout=5m
 
       - name: Build
         run: go build ./...
