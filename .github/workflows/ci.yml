@@ -16,10 +16,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: "go.sum"
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
