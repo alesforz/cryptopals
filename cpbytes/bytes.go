@@ -116,6 +116,9 @@ func PrintBlocks(bb []byte, blkSize uint, out io.Writer) {
 			blkEnd   = blkStart + blkSize
 			blk      = bb[blkStart:blkEnd]
 		)
-		out.Write(fmt.Appendf(nil, "%-*v\t%s\n", 3, blk, blk))
+		_, err := out.Write(fmt.Appendf(nil, "%-*v\t%s\n", 3, blk, blk))
+		if err != nil {
+			panic(fmt.Sprintf("printing block %d: %s", i, err))
+		}
 	}
 }
